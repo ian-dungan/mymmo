@@ -1,7 +1,3 @@
-if (typeof window.pc === 'undefined') {
-  throw new Error('PlayCanvas engine failed to load. Please verify the CDN URL.');
-}
-
 const canvas = document.getElementById('application-canvas');
 const app = new pc.Application(canvas, {
   mouse: new pc.Mouse(canvas),
@@ -15,14 +11,13 @@ window.addEventListener('resize', () => app.resizeCanvas());
 // Basic rendering setup
 app.scene.gammaCorrection = pc.GAMMA_SRGB;
 app.scene.toneMapping = pc.TONEMAP_ACES;
-app.scene.exposure = 1.1;
+app.scene.exposure = 1.2;
 app.scene.skyboxMip = 2;
-app.scene.ambientLight = new pc.Color(0.25, 0.28, 0.35);
 
 // Player entity (camera)
 const camera = new pc.Entity('camera');
 camera.addComponent('camera', {
-  clearColor: new pc.Color(0.13, 0.18, 0.26),
+  clearColor: new pc.Color(0.02, 0.04, 0.08),
   fov: 70,
 });
 app.root.addChild(camera);
@@ -31,133 +26,97 @@ app.root.addChild(camera);
 const light = new pc.Entity('sun');
 light.addComponent('light', {
   type: 'directional',
-  color: new pc.Color(1, 0.98, 0.93),
-  intensity: 2.1,
+  color: new pc.Color(1, 0.97, 0.9),
+  intensity: 2.4,
   castShadows: true,
   shadowDistance: 200,
   shadowResolution: 1024,
 });
-light.setLocalEulerAngles(55, 35, 0);
+light.setLocalEulerAngles(55, 45, 0);
 app.root.addChild(light);
 
-// Materials
-function makeMaterial(color, metalness = 0, roughness = 0.65) {
+// Ground chunk system
+const CHUNK_SIZE = 140;
+const VIEW_RADIUS = 1; // load surrounding chunks in a 3x3 grid
+const chunkStore = new Map();
+const chunkColor = new pc.Color(0.17, 0.35, 0.23);
+const accentColor = new pc.Color(0.23, 0.44, 0.62);
+
+function chunkKey(cx, cz) {
+  return `${cx},${cz}`;
+}
+
+function createChunkEntity(cx, cz) {
+  const chunk = new pc.Entity(`chunk-${cx}-${cz}`);
+  chunk.addComponent('model', { type: 'plane' });
+  chunk.setLocalScale(CHUNK_SIZE, 1, CHUNK_SIZE);
+  chunk.setLocalPosition(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
+
+  // subtle color tint via a basic material
   const material = new pc.StandardMaterial();
-  material.diffuse = color.clone();
-  material.metalness = metalness;
-  material.useMetalness = true;
-  material.roughness = roughness;
+  material.diffuse = chunkColor.clone();
+  material.ambient = chunkColor.clone();
   material.update();
-  return material;
+  chunk.model.material = material;
+
+  // Add a few decorative pillars so streaming is visible
+  const pillarCount = 5;
+  for (let i = 0; i < pillarCount; i++) {
+    const pillar = new pc.Entity(`pillar-${i}`);
+    pillar.addComponent('model', { type: 'box' });
+
+    const px = (Math.random() - 0.5) * (CHUNK_SIZE * 0.7);
+    const pz = (Math.random() - 0.5) * (CHUNK_SIZE * 0.7);
+    const height = 4 + Math.random() * 12;
+
+    pillar.setLocalScale(2 + Math.random() * 2, height, 2 + Math.random() * 2);
+    pillar.setLocalPosition(px, height / 2, pz);
+
+    const pillarMat = new pc.StandardMaterial();
+    pillarMat.diffuse = accentColor.clone();
+    pillarMat.ambient = accentColor.clone();
+    pillarMat.metalness = 0.05;
+    pillarMat.useMetalness = true;
+    pillarMat.update();
+
+    pillar.model.material = pillarMat;
+    chunk.addChild(pillar);
+  }
+
+  return chunk;
 }
 
-const palette = {
-  sand: new pc.Color(0.63, 0.58, 0.48),
-  stone: new pc.Color(0.52, 0.5, 0.46),
-  plaster: new pc.Color(0.74, 0.72, 0.66),
-  roof: new pc.Color(0.33, 0.18, 0.16),
-  water: new pc.Color(0.17, 0.36, 0.52),
-  wood: new pc.Color(0.43, 0.28, 0.18),
-};
+function ensureChunksAround(position) {
+  const cx = Math.floor(position.x / CHUNK_SIZE);
+  const cz = Math.floor(position.z / CHUNK_SIZE);
 
-// Helpers for spawning primitives
-function addBox(name, size, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'box' });
-  entity.setLocalScale(size.x, size.y, size.z);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
+  for (let x = cx - VIEW_RADIUS; x <= cx + VIEW_RADIUS; x++) {
+    for (let z = cz - VIEW_RADIUS; z <= cz + VIEW_RADIUS; z++) {
+      const key = chunkKey(x, z);
+      if (!chunkStore.has(key)) {
+        const chunk = createChunkEntity(x, z);
+        chunkStore.set(key, chunk);
+        app.root.addChild(chunk);
+      }
+    }
+  }
+
+  // prune far chunks
+  for (const [key, chunk] of chunkStore.entries()) {
+    const [x, z] = key.split(',').map(Number);
+    if (Math.abs(x - cx) > VIEW_RADIUS || Math.abs(z - cz) > VIEW_RADIUS) {
+      chunk.destroy();
+      chunkStore.delete(key);
+    }
+  }
 }
-
-function addCylinder(name, radius, height, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'cylinder' });
-  entity.setLocalScale(radius, height, radius);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
-}
-
-function addPlane(name, size, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'plane' });
-  entity.setLocalScale(size.x, 1, size.z);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
-}
-
-// Build the Freeport-inspired zone
-function buildFreeportLanding() {
-  // Ground and harbor water
-  addPlane('ground', new pc.Vec3(280, 1, 280), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
-  const water = addPlane('harbor-water', new pc.Vec3(200, 1, 160), new pc.Vec3(120, -0.3, 80), makeMaterial(palette.water, 0.1, 0.4));
-  water.model.castShadows = false;
-
-  // City walls
-  const wallMat = makeMaterial(palette.stone, 0, 0.7);
-  const wallHeight = 12;
-  const wallThickness = 4;
-  const extent = 120;
-  addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat);
-  addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat);
-  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat);
-
-  // Gate and watchtowers facing the harbor
-  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10), wallMat);
-  addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6));
-  addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6));
-
-  // Docks and pier
-  const dockMat = makeMaterial(palette.wood, 0.05, 0.65);
-  addBox('main-dock', new pc.Vec3(60, 1.2, 12), new pc.Vec3(extent + 24, 0.6, 24), dockMat);
-  addBox('pier-a', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 40, 0.5, 44), dockMat);
-  addBox('pier-b', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 8, 0.5, 44), dockMat);
-
-  // Central plaza
-  addPlane('plaza', new pc.Vec3(80, 1, 80), new pc.Vec3(-20, 0.05, 10), makeMaterial(palette.plaster, 0, 0.95));
-  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(-20, 5, 10), makeMaterial(palette.roof, 0.15, 0.4));
-
-  // Inns and market stalls
-  const houseMat = makeMaterial(palette.plaster, 0, 0.82);
-  const roofMat = makeMaterial(palette.roof, 0, 0.55);
-  const homes = [
-    { pos: new pc.Vec3(-40, 3, -10), size: new pc.Vec3(16, 6, 14) },
-    { pos: new pc.Vec3(-68, 3, 30), size: new pc.Vec3(18, 6, 16) },
-    { pos: new pc.Vec3(10, 3, -34), size: new pc.Vec3(20, 7, 16) },
-    { pos: new pc.Vec3(30, 3, 30), size: new pc.Vec3(22, 7, 16) },
-  ];
-  homes.forEach((home, i) => {
-    const base = addBox(`home-${i}`, home.size, home.pos, houseMat);
-    addBox(`home-${i}-roof`, new pc.Vec3(home.size.x * 1.05, home.size.y * 0.3, home.size.z * 1.05), new pc.Vec3(home.pos.x, home.pos.y + home.size.y * 0.6, home.pos.z), roofMat);
-    base.model.castShadows = true;
-  });
-
-  // Hall and barracks near the gate
-  addBox('hall', new pc.Vec3(32, 10, 18), new pc.Vec3(60, 5, -20), houseMat);
-  addBox('hall-roof', new pc.Vec3(34, 3, 20), new pc.Vec3(60, 11.5, -20), roofMat);
-  addBox('barracks', new pc.Vec3(28, 8, 14), new pc.Vec3(40, 4, 24), houseMat);
-  addBox('barracks-roof', new pc.Vec3(30, 2.5, 16), new pc.Vec3(40, 9, 24), roofMat);
-
-  // Pathways
-  const pathMat = makeMaterial(new pc.Color(0.46, 0.43, 0.38), 0, 0.95);
-  addPlane('main-road', new pc.Vec3(20, 1, 200), new pc.Vec3(60, 0.04, 0), pathMat);
-  addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
-  addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
-}
-
-buildFreeportLanding();
 
 // Player movement handling
 const moveSpeed = 10;
 const sprintMultiplier = 1.8;
 const rotSpeed = 0.0022;
 let yaw = 0;
-let pitch = -0.1;
+let pitch = 0;
 const velocity = new pc.Vec3();
 const direction = new pc.Vec3();
 
@@ -190,12 +149,15 @@ app.mouse.on(pc.EVENT_MOUSEMOVE, (e) => {
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
 });
 
-camera.setLocalPosition(-120, 5.5, 0);
-camera.setLocalEulerAngles(pc.math.radToDeg(pitch), pc.math.radToDeg(yaw), 0);
+camera.setLocalPosition(0, 6, 10);
+yaw = 0;
+pitch = -0.1;
 
 // UI helpers
+const chunkLabel = document.getElementById('chunkCount');
 const posLabel = document.getElementById('playerPos');
 function updateHud() {
+  chunkLabel.textContent = `${chunkStore.size}`;
   const p = camera.getPosition();
   posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
@@ -221,8 +183,11 @@ app.on('update', (dt) => {
 
   camera.translate(velocity);
   camera.setLocalEulerAngles(pc.math.radToDeg(pitch), pc.math.radToDeg(yaw), 0);
+
+  ensureChunksAround(camera.getPosition());
   updateHud();
 });
 
+ensureChunksAround(camera.getPosition());
 updateHud();
 app.start();
