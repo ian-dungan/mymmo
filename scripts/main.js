@@ -1,7 +1,3 @@
-if (typeof window.pc === 'undefined') {
-  throw new Error('PlayCanvas engine failed to load. Please verify the CDN URL.');
-}
-
 const canvas = document.getElementById('application-canvas');
 const app = new pc.Application(canvas, {
   mouse: new pc.Mouse(canvas),
