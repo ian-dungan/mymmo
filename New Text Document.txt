@@ -1,0 +1,129 @@
+; ffxi-windower-login.ahk
+; AutoHotkey v1 script: launch FFXI via Windower and auto-login each account.
+; Uses "detect new window" method so it works when Windower spawns the actual FFXI process.
+
+#NoEnv
+SendMode, Input
+SetWorkingDir, %A_ScriptDir%
+SetTitleMatchMode, 2  ; partial match
+
+; =========================
+; === CONFIGURE BELOW ====
+; =========================
+
+; Full path to Windower executable:
+WindowerPath := C:\FFXI\Tools\Windower"\Windower.exe"
+
+; Accounts: add as many as you want:
+Accounts := [3]
+Accounts.Push({user:"YBCJ8331", pass:"Password1", extraDelay:500})
+Accounts.Push({user:"VBHA2257", pass:"Password1", extraDelay:500})
+; Accounts.Push({user:"UQSB0842", pass:"Password1"})
+
+; Timing (tweak to match your system)
+launchPollTimeout := 50000     ; ms to wait for the new login window (30s)
+pollInterval := 250            ; ms between polls
+betweenAccountsDelay := 5000   ; ms between account launches
+
+; Unique text fragment found in the game's login window title.
+; Example: "FINAL FANTASY XI" or "PlayOnline"
+LoginTitleFragment := "FINAL FANTASY XI"
+
+; =========================
+; ==== END CONFIGURE ======
+; =========================
+
+if (!FileExist(WindowerPath)) {
+    MsgBox, 16, Error, Windower executable not found:`n%WindowerPath%`nEdit WindowerPath in the script.
+    ExitApp
+}
+
+; helper: get current window id set (object with key=id -> true)
+GetWindowIdSet() {
+    winIds := {}  ; associative object
+    WinGet, idlist, List
+    Loop, % idlist
+    {
+        id := idlist%A_Index%
+        winIds[id] := true
+    }
+    return winIds
+}
+
+; helper: find a new window id not present in previous set that also matches title fragment (or any)
+FindNewWindow(prevSet, titleFragment) {
+    WinGet, idlist, List, %titleFragment%
+    Loop, % idlist
+    {
+        id := idlist%A_Index%
+        if (!prevSet.HasKey(id)) {
+            return id
+        }
+    }
+    ; if titleFragment did not return any matches, optionally search all windows for any new one:
+    if (titleFragment = "") {
+        WinGet, alllist, List
+        Loop, % alllist
+        {
+            id := alllist%A_Index%
+            if (!prevSet.HasKey(id)) {
+                return id
+            }
+        }
+    }
+    return ""  ; none found yet
+}
+
+Loop, % Accounts.Length()
+{
+    idx := A_Index - 1
+    acct := Accounts[idx]
+
+    ; capture existing windows before launching
+    prevWins := GetWindowIdSet()
+
+    ; Launch Windower (no visible console) and let it spawn the game.
+    Run, % """" WindowerPath """" , , , runPID
+    if (!runPID) {
+        MsgBox, 16, Error, Failed to start Windower for account #% (idx+1)
+        Continue
+    }
+
+    ; Wait for a new window to appear that matches LoginTitleFragment (or any new window if fragment blank)
+    startTick := A_TickCount
+    newWin := ""
+    while ((A_TickCount - startTick) < launchPollTimeout)
+    {
+        newWin := FindNewWindow(prevWins, LoginTitleFragment)
+        if (newWin)
+            break
+        Sleep, % pollInterval
+    }
+
+    if (!newWin) {
+        MsgBox, 48, Warning, Could not detect a new login window for account #% (idx+1) within %launchPollTimeout% ms.`nThe script will attempt to send keys to the currently active window.
+    } else {
+        ; Activate the discovered window
+        WinActivate, ahk_id %newWin%
+        WinWaitActive, ahk_id %newWin%, , 5
+    }
+
+    ; Optional per-account delay before sending credentials
+    if (IsObject(acct) && acct.HasKey("extraDelay"))
+        Sleep, % acct.extraDelay
+
+    ; Send username, Tab, password, Enter
+    Send, {Text}% acct.user
+    Sleep, 120
+    Send, {Tab}
+    Sleep, 120
+    Send, {Text}% acct.pass
+    Sleep, 120
+    Send, {Enter}
+
+    ; Wait a bit before launching next instance
+    Sleep, % betweenAccountsDelay
+}
+
+MsgBox, 64, Done, All accounts processed (or attempted).
+ExitApp
