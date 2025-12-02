@@ -71,6 +71,26 @@ canvas {
   line-height: 1.45;
 }
 
+.card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card-title {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.card-body {
+  color: #d6deee;
+  line-height: 1.4;
+  font-size: 13px;
+}
+
 .hidden {
   display: none;
 }
@@ -132,6 +152,39 @@ canvas {
 
 .interact-button:active {
   transform: translateY(1px);
+}
+
+.nameplate {
+  position: fixed;
+  pointer-events: none;
+  min-width: 120px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 4px 8px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.nameplate-name {
+  font-weight: 700;
+  color: #f1e6c5;
+  margin-bottom: 4px;
+}
+
+.nameplate-health {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.health-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #8bed4f 0%, #60c443 100%);
 }
 
 @media (max-width: 600px) {

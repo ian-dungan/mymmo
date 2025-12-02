@@ -63,9 +63,57 @@ const palette = {
   sailor: new pc.Color(0.24, 0.46, 0.74),
 };
 
+const eqClasses = {
+  Warrior: {
+    stats: { STR: 90, STA: 85, AGI: 80, DEX: 75, INT: 55, WIS: 60, CHA: 65 },
+    baseHP: 150,
+    baseMana: 40,
+  },
+  Cleric: {
+    stats: { STR: 65, STA: 75, AGI: 65, DEX: 60, INT: 70, WIS: 95, CHA: 75 },
+    baseHP: 110,
+    baseMana: 180,
+  },
+  Ranger: {
+    stats: { STR: 75, STA: 75, AGI: 85, DEX: 85, INT: 60, WIS: 70, CHA: 70 },
+    baseHP: 125,
+    baseMana: 120,
+  },
+};
+
+const playerProfile = {
+  name: 'Adventurer',
+  classKey: 'Ranger',
+  level: 8,
+};
+
+function buildPlayerStats() {
+  const cls = eqClasses[playerProfile.classKey];
+  const hp = cls.baseHP + playerProfile.level * 12;
+  const mana = cls.baseMana + playerProfile.level * 8;
+  return {
+    ...cls.stats,
+    HP: hp,
+    Mana: mana,
+    AC: 120 + Math.floor(playerProfile.level * 2.5),
+  };
+}
+
 // Helpers for spawning primitives
 const colliders = [];
 const npcs = [];
+const actors = [];
+const questCrates = [];
+
+const supplyQuest = {
+  id: 'dock-supply-run',
+  name: 'Dock Supply Run',
+  description: 'Gather three marked supply crates for Quartermaster Ryn.',
+  required: 3,
+  progress: 0,
+  state: 'available', // available | active | ready
+  reward: '2s + harbor favor',
+};
 
 function registerBoxCollider(position, size, padding = 0.6) {
   colliders.push({
@@ -73,6 +121,10 @@ function registerBoxCollider(position, size, padding = 0.6) {
     halfExtents: new pc.Vec3(size.x * 0.5, size.y * 0.5, size.z * 0.5),
     padding,
   });
+}
+
+function registerActor(actor) {
+  actors.push(actor);
 }
 
 function addBox(name, size, position, material, withCollider = false) {
@@ -109,16 +161,81 @@ function addPlane(name, size, position, material, withCollider = false) {
   return entity;
 }
 
-function addNPC(name, position, bodyColor, dialogLines) {
-  const npc = new pc.Entity(name);
-  npc.addComponent('render', { type: 'capsule' });
-  npc.setLocalScale(1.1, 2.2, 1.1);
-  npc.setLocalPosition(position.x, position.y + 1.1, position.z);
-  npc.render.material = makeMaterial(bodyColor, 0, 0.55);
-  npc.castShadows = true;
-  app.root.addChild(npc);
-  npcs.push({ entity: npc, name, dialogLines, lineIndex: 0 });
-  registerBoxCollider(new pc.Vec3(position.x, position.y + 1.1, position.z), new pc.Vec3(1.4, 2.2, 1.4), 0.3);
+function buildHumanoid(name, position, colors) {
+  const root = new pc.Entity(name);
+  root.setLocalPosition(position.x, position.y, position.z);
+
+  const torso = new pc.Entity(`${name}-torso`);
+  torso.addComponent('render', { type: 'box' });
+  torso.setLocalScale(1.1, 1.6, 0.8);
+  torso.setLocalPosition(0, 1.4, 0);
+  torso.render.material = makeMaterial(colors.torso, 0, 0.55);
+  torso.castShadows = true;
+
+  const head = new pc.Entity(`${name}-head`);
+  head.addComponent('render', { type: 'sphere' });
+  head.setLocalScale(0.6, 0.6, 0.6);
+  head.setLocalPosition(0, 2.3, 0);
+  head.render.material = makeMaterial(colors.skin, 0, 0.5);
+  head.castShadows = true;
+
+  const legs = new pc.Entity(`${name}-legs`);
+  legs.addComponent('render', { type: 'cylinder' });
+  legs.setLocalScale(0.7, 1.4, 0.7);
+  legs.setLocalPosition(0, 0.6, 0);
+  legs.render.material = makeMaterial(colors.legs, 0, 0.6);
+  legs.castShadows = true;
+
+  const arms = new pc.Entity(`${name}-arms`);
+  arms.addComponent('render', { type: 'cylinder' });
+  arms.setLocalScale(1.4, 0.35, 0.35);
+  arms.setLocalEulerAngles(0, 0, 90);
+  arms.setLocalPosition(0, 1.6, 0);
+  arms.render.material = makeMaterial(colors.torso, 0, 0.55);
+  arms.castShadows = true;
+
+  root.addChild(torso);
+  root.addChild(head);
+  root.addChild(legs);
+  root.addChild(arms);
+  app.root.addChild(root);
+
+  registerBoxCollider(position.clone().add(new pc.Vec3(0, 1.1, 0)), new pc.Vec3(1.4, 2.6, 1.4), 0.25);
+
+  return { root, head };
+}
+
+function addNPC(name, position, colors, dialogLines, options = {}) {
+  const humanoid = buildHumanoid(name, position, colors);
+  npcs.push({
+    entity: humanoid.root,
+    name,
+    dialogLines,
+    lineIndex: 0,
+    ...options,
+  });
+
+  registerActor({
+    type: 'npc',
+    name,
+    entity: humanoid.root,
+    head: humanoid.head,
+    health: options.health || 140,
+    maxHealth: options.health || 140,
+  });
+}
+
+function addQuestCrate(label, position) {
+  const crate = new pc.Entity(label);
+  crate.addComponent('render', { type: 'box' });
+  crate.setLocalScale(2.2, 2.2, 2.2);
+  crate.setLocalPosition(position.x, position.y + 1.1, position.z);
+  crate.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6);
+  crate.castShadows = true;
+  app.root.addChild(crate);
+
+  questCrates.push({ entity: crate, collected: false });
+  registerBoxCollider(position.clone().add(new pc.Vec3(0, 1.1, 0)), new pc.Vec3(2.2, 2.2, 2.2), 0.3);
 }
 
 // Build the Freeport-inspired zone
@@ -179,19 +296,44 @@ function buildFreeportLanding() {
   addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
   addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
 
-  // NPCs
-  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), palette.sailor, [
+  // NPCs and interactables
+  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), { torso: palette.sailor, legs: palette.stone, skin: new pc.Color(0.93, 0.83, 0.7) }, [
     'Busy day at the docks. Ships from Qeynos arrived at dawn.',
     'If you head inland, watch for the market patrols—they keep things tidy.',
   ]);
-  addNPC('Quartermaster Ryn', new pc.Vec3(40, 0, -14), palette.cloth, [
-    'Supplies are thin, but the Freeport guard always gets first pick.',
-    'Need armor? The smithy by the north wall can size you up.',
-  ]);
-  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), palette.noble, [
+  addNPC(
+    'Quartermaster Ryn',
+    new pc.Vec3(40, 0, -14),
+    { torso: palette.cloth, legs: palette.stone, skin: new pc.Color(0.86, 0.76, 0.64) },
+    [
+      'Supplies are thin, but the Freeport guard always gets first pick.',
+      'Need armor? The smithy by the north wall can size you up.',
+    ],
+    { questGiver: true }
+  );
+  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), { torso: palette.noble, legs: palette.roof, skin: new pc.Color(0.9, 0.8, 0.72) }, [
     'The sea breeze carries whispers of distant isles.',
     'When the bells toll at dusk, the harbor gates close—plan your return.',
   ]);
+
+  addNPC('Guard Veylan', new pc.Vec3(-12, 0, 6), { torso: palette.stone, legs: palette.roof, skin: new pc.Color(0.72, 0.63, 0.55) }, [
+    'Stay clear of troublemaker alleys—my patrol covers the plaza.',
+    'If you spot loose crates, report back to Quartermaster Ryn.',
+  ], { health: 180 });
+
+  addQuestCrate('Supply Crate A', new pc.Vec3(70, 0, -6));
+  addQuestCrate('Supply Crate B', new pc.Vec3(94, 0, 34));
+  addQuestCrate('Supply Crate C', new pc.Vec3(54, 0, 46));
+
+  const dummy = addCylinder('Training Dummy', 3, 8, new pc.Vec3(-28, 4, 12), makeMaterial(new pc.Color(0.45, 0.32, 0.2), 0.05, 0.6), true);
+  registerActor({
+    type: 'enemy',
+    name: 'Training Dummy',
+    entity: dummy,
+    head: dummy, // top of cylinder works for nameplate
+    health: 80,
+    maxHealth: 80,
+  });
 }
 
 buildFreeportLanding();
@@ -209,6 +351,18 @@ const direction = new pc.Vec3();
 const radToDeg = (radians) => (radians * 180) / Math.PI;
 const interactRadius = 5.5;
 let interactionQueued = false;
+let selectedTarget = null;
+const screenPos = new pc.Vec3();
+const playerStats = buildPlayerStats();
+const playerActor = {
+  type: 'player',
+  name: `${playerProfile.name} (You)`,
+  entity: camera,
+  head: null,
+  health: playerStats.HP,
+  maxHealth: playerStats.HP,
+};
+registerActor(playerActor);
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
@@ -367,6 +521,21 @@ canvas.addEventListener('click', () => {
   }
 });
 
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (!document.pointerLockElement) {
+    handlePointerSelect(e.clientX, e.clientY);
+  } else {
+    handlePointerSelect(window.innerWidth / 2, window.innerHeight / 2);
+  }
+});
+
+canvas.addEventListener('touchend', (e) => {
+  for (const touch of e.changedTouches) {
+    handlePointerSelect(touch.clientX, touch.clientY);
+  }
+});
+
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
   app.mouse.enabled = locked;
@@ -389,6 +558,11 @@ const dialogueEl = document.getElementById('dialogue');
 const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
 const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
 const interactButton = document.getElementById('interact-button');
+const classPanelEl = document.getElementById('classPanel');
+const questStatusEl = document.getElementById('questStatus');
+const nameplateEl = document.getElementById('nameplate');
+const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
+const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
 
 interactButton.addEventListener('click', () => {
   interactionQueued = true;
@@ -399,28 +573,163 @@ function updateHud() {
   posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
 
-function findNearestNPC() {
+function renderClassPanel() {
+  const stats = buildPlayerStats();
+  const lines = [
+    `<strong>${playerProfile.name}</strong> — Level ${playerProfile.level} ${playerProfile.classKey}`,
+    `HP ${stats.HP} · Mana ${stats.Mana} · AC ${stats.AC}`,
+    `STR ${stats.STR} · STA ${stats.STA} · AGI ${stats.AGI} · DEX ${stats.DEX}`,
+    `INT ${stats.INT} · WIS ${stats.WIS} · CHA ${stats.CHA}`,
+  ];
+  classPanelEl.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
+}
+
+function updateQuestStatus() {
+  if (supplyQuest.state === 'available') {
+    questStatusEl.textContent = `${supplyQuest.name}: ${supplyQuest.description}`;
+  } else if (supplyQuest.state === 'active') {
+    questStatusEl.textContent = `${supplyQuest.name}: ${supplyQuest.progress}/${supplyQuest.required} crates gathered.`;
+  } else if (supplyQuest.state === 'ready') {
+    questStatusEl.textContent = `${supplyQuest.name}: Return to Quartermaster Ryn for your reward.`;
+  }
+}
+
+function getHeadPosition(actor) {
+  if (actor.type === 'player') {
+    return camera.getPosition().clone().add(new pc.Vec3(0, 1.8, 0));
+  }
+  if (actor.head) return actor.head.getWorldPosition();
+  return actor.entity.getPosition();
+}
+
+function updateNameplatePosition() {
+  if (!selectedTarget) {
+    nameplateEl.classList.add('hidden');
+    return;
+  }
+  const worldPos = getHeadPosition(selectedTarget);
+  camera.camera.worldToScreen(worldPos, screenPos);
+  if (screenPos.z < 0) {
+    nameplateEl.classList.add('hidden');
+    return;
+  }
+  nameplateEl.style.left = `${screenPos.x}px`;
+  nameplateEl.style.top = `${screenPos.y - 28}px`;
+  nameplateNameEl.textContent = `${selectedTarget.name}`;
+  const ratio = selectedTarget.health / selectedTarget.maxHealth;
+  nameplateHealthBar.style.width = `${Math.max(5, ratio * 100)}%`;
+  nameplateEl.classList.remove('hidden');
+}
+
+function selectActor(actor) {
+  selectedTarget = actor;
+  updateNameplatePosition();
+}
+
+function handlePointerSelect(clientX, clientY) {
+  let closest = null;
+  let closestDist = 90;
+  actors.forEach((actor) => {
+    const worldPos = getHeadPosition(actor);
+    camera.camera.worldToScreen(worldPos, screenPos);
+    if (screenPos.z < 0) return;
+    const dx = screenPos.x - clientX;
+    const dy = screenPos.y - clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < closestDist) {
+      closest = actor;
+      closestDist = dist;
+    }
+  });
+  if (closest) selectActor(closest);
+}
+
+function actorForEntity(entity) {
+  return actors.find((a) => a.entity === entity) || null;
+}
+
+function interactWithCrate(crate) {
+  if (crate.collected || supplyQuest.state !== 'active') return;
+  crate.collected = true;
+  crate.entity.render.material = makeMaterial(new pc.Color(0.32, 0.24, 0.2), 0, 0.8);
+  supplyQuest.progress = Math.min(supplyQuest.required, supplyQuest.progress + 1);
+  showDialogue('Supply Crate', `You secure a crate. ${supplyQuest.progress}/${supplyQuest.required} gathered.`);
+  if (supplyQuest.progress >= supplyQuest.required) {
+    supplyQuest.state = 'ready';
+  }
+  updateQuestStatus();
+}
+
+function questDialogueForRyn() {
+  if (supplyQuest.state === 'available') {
+    return `${supplyQuest.name}: ${supplyQuest.description} Reward: ${supplyQuest.reward}.`;
+  }
+  if (supplyQuest.state === 'active') {
+    return `${supplyQuest.progress}/${supplyQuest.required} crates gathered. Keep looking around the docks.`;
+  }
+  if (supplyQuest.state === 'ready') {
+    return `Well done. Here's your pay. Crates will keep arriving—check again soon.`;
+  }
+  return '';
+}
+
+function interactWithNPC(npc) {
+  const actor = actorForEntity(npc.entity);
+  if (actor) selectActor(actor);
+
+  if (npc.questGiver) {
+    if (supplyQuest.state === 'available') {
+      supplyQuest.state = 'active';
+      supplyQuest.progress = 0;
+      questCrates.forEach((c) => (c.collected = false));
+      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
+    } else if (supplyQuest.state === 'ready') {
+      supplyQuest.state = 'available';
+      supplyQuest.progress = 0;
+      questCrates.forEach((c) => (c.collected = false));
+      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
+    }
+    updateQuestStatus();
+    showDialogue(npc.name, questDialogueForRyn());
+    return;
+  }
+
+  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
+  npc.lineIndex += 1;
+  showDialogue(npc.name, line);
+}
+
+function findNearestInteractable() {
   const playerPos = camera.getPosition();
   let nearest = null;
   let nearestDist = interactRadius;
+
   for (const npc of npcs) {
     const dist = npc.entity.getPosition().distance(playerPos);
     if (dist <= nearestDist) {
-      nearest = npc;
+      nearest = { type: 'npc', ref: npc };
       nearestDist = dist;
     }
   }
+
+  questCrates.forEach((crate) => {
+    if (crate.collected || supplyQuest.state !== 'active') return;
+    const dist = crate.entity.getPosition().distance(playerPos);
+    if (dist <= nearestDist) {
+      nearest = { type: 'crate', ref: crate };
+      nearestDist = dist;
+    }
+  });
+
   return nearest;
 }
 
-function showDialogue(npc) {
-  if (!npc) {
+function showDialogue(name, line) {
+  if (!name || !line) {
     dialogueEl.classList.add('hidden');
     return;
   }
-  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
-  npc.lineIndex += 1;
-  dialogueNameEl.textContent = npc.name;
+  dialogueNameEl.textContent = name;
   dialogueTextEl.textContent = line;
   dialogueEl.classList.remove('hidden');
 }
@@ -492,18 +801,24 @@ app.on('update', (dt) => {
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
-  const nearest = findNearestNPC();
-  if (nearest) {
-    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.name}.`;
+  const nearest = findNearestInteractable();
+  if (nearest?.type === 'npc') {
+    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.ref.name}.`;
     if (interactionQueued) {
-      showDialogue(nearest);
+      interactWithNPC(nearest.ref);
     }
+  } else if (nearest?.type === 'crate') {
+    interactionHint.innerHTML = 'Press <strong>E</strong> / south face / tap Interact to secure this supply crate.';
+    if (interactionQueued) interactWithCrate(nearest.ref);
   } else {
     interactionHint.innerHTML = 'Walk up to someone and press <strong>E</strong> / south face / tap Interact.';
   }
   interactionQueued = false;
   updateHud();
+  updateNameplatePosition();
 });
 
+renderClassPanel();
+updateQuestStatus();
 updateHud();
 app.start();

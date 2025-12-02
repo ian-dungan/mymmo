@@ -14,12 +14,26 @@
 <body>
   <div class="hud">
     <h1>Freeport Landing (Prototype)</h1>
-    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
+    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint. Tap/left-click characters to select them.</p>
     <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
     <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
     <div id="dialogue" class="dialogue hidden">
       <div class="dialogue-name"></div>
       <div class="dialogue-text"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Character</div>
+      <div id="classPanel" class="card-body"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Quest Journal</div>
+      <div id="questStatus" class="card-body">No active quests. Speak to Quartermaster Ryn.</div>
+    </div>
+  </div>
+  <div id="nameplate" class="nameplate hidden" aria-live="polite">
+    <div class="nameplate-name"></div>
+    <div class="nameplate-health">
+      <div class="health-bar"></div>
     </div>
   </div>
   <div class="touch-ui">
