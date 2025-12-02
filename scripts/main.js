@@ -586,7 +586,7 @@ function buildFreeportLanding() {
   const areaScale = Math.sqrt(freeportScale);
   const scaleSize = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
   const scalePos = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
-  const extent = 120 * areaScale;
+  const freeportExtent = 120 * areaScale;
 
   // Ground and harbor water
   addPlane('ground', scaleSize(new pc.Vec3(280, 1, 280)), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
@@ -594,28 +594,28 @@ function buildFreeportLanding() {
   const water = addPlane('harbor-water', scaleSize(new pc.Vec3(200, 1, 160)), scalePos(new pc.Vec3(120, -0.3, 80)), makeMaterial(palette.water, 0.1, 0.4));
   water.render.castShadows = false;
   addLighthouse('harbor-lighthouse', scalePos(new pc.Vec3(168, 0, -48)));
-  addLantern('dock-lantern-a', scalePos(new pc.Vec3(extent + 14, 0, 46)));
-  addLantern('dock-lantern-b', scalePos(new pc.Vec3(extent + 52, 0, 30)));
-  addLantern('dock-lantern-c', scalePos(new pc.Vec3(extent + 24, 0, -12)));
+  addLantern('dock-lantern-a', scalePos(new pc.Vec3(freeportExtent + 14, 0, 46)));
+  addLantern('dock-lantern-b', scalePos(new pc.Vec3(freeportExtent + 52, 0, 30)));
+  addLantern('dock-lantern-c', scalePos(new pc.Vec3(freeportExtent + 24, 0, -12)));
 
   // City walls
   const wallMat = makeMaterial(palette.stone, 0, 0.7);
   const wallHeight = 12;
   const wallThickness = 4;
-  addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat, true);
-  addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat, true);
-  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat, true);
+  addBox('north-wall', new pc.Vec3(freeportExtent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -freeportExtent), wallMat, true);
+  addBox('south-wall', new pc.Vec3(freeportExtent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, freeportExtent), wallMat, true);
+  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, freeportExtent * 2), new pc.Vec3(-freeportExtent, wallHeight / 2, 0), wallMat, true);
 
   // Gate and watchtowers facing the harbor
-  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10 * areaScale), wallMat, false);
-  addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6), true);
-  addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6), true);
+  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(freeportExtent, wallHeight * 0.75 * 0.5, 10 * areaScale), wallMat, false);
+  addCylinder('north-tower', 6, 18, new pc.Vec3(freeportExtent - 8, 9, -freeportExtent + 8), makeMaterial(palette.plaster, 0, 0.6), true);
+  addCylinder('south-tower', 6, 18, new pc.Vec3(freeportExtent - 8, 9, freeportExtent - 8), makeMaterial(palette.plaster, 0, 0.6), true);
 
   // Docks and pier
   const dockMat = makeMaterial(palette.wood, 0.05, 0.65);
-  addBox('main-dock', new pc.Vec3(60 * areaScale, 1.2, 12 * areaScale), new pc.Vec3(extent + 24 * areaScale, 0.6, 24 * areaScale), dockMat, true);
-  addBox('pier-a', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(extent + 40 * areaScale, 0.5, 44 * areaScale), dockMat, true);
-  addBox('pier-b', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(extent + 8 * areaScale, 0.5, 44 * areaScale), dockMat, true);
+  addBox('main-dock', new pc.Vec3(60 * areaScale, 1.2, 12 * areaScale), new pc.Vec3(freeportExtent + 24 * areaScale, 0.6, 24 * areaScale), dockMat, true);
+  addBox('pier-a', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(freeportExtent + 40 * areaScale, 0.5, 44 * areaScale), dockMat, true);
+  addBox('pier-b', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(freeportExtent + 8 * areaScale, 0.5, 44 * areaScale), dockMat, true);
 
   // Central plaza
   const plazaPos = scalePos(new pc.Vec3(-20, 0.05, 10));
@@ -673,10 +673,10 @@ function buildFreeportLanding() {
 
   // Pathways and highways toward the desert
   const pathMat = makeMaterial(new pc.Color(0.46, 0.43, 0.38), 0, 0.95);
-  addPlane('main-road', new pc.Vec3(20, 1, 200 * areaScale), new pc.Vec3(extent * 0.6, 0.04, 0), pathMat);
+  addPlane('main-road', new pc.Vec3(20, 1, 200 * areaScale), new pc.Vec3(freeportExtent * 0.6, 0.04, 0), pathMat);
   addPlane('plaza-road', new pc.Vec3(60 * areaScale, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
   addPlane('plaza-road-west', new pc.Vec3(16, 1, 80 * areaScale), scalePos(new pc.Vec3(-40, 0.04, 10)), pathMat);
-  addPlane('desert-road', new pc.Vec3(desertStartX - extent, 1, 18), new pc.Vec3((desertStartX + extent) * 0.5, 0.04, -8), pathMat);
+  addPlane('desert-road', new pc.Vec3(desertStartX - freeportExtent, 1, 18), new pc.Vec3((desertStartX + freeportExtent) * 0.5, 0.04, -8), pathMat);
 
   // NPCs and interactables
   addNPC('Dockhand Mira', scalePos(new pc.Vec3(110, 0, 30)), { torso: palette.sailor, legs: palette.stone, skin: new pc.Color(0.93, 0.83, 0.7) }, [
