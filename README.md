@@ -1,11 +1,10 @@
 # Freeport Landing (PlayCanvas)
-A single-zone prototype inspired by EverQuest's Freeport harbor. Walk the docks, city walls, and plaza to test controls and scale.
-Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Tap **Tab** (keyboard) or **RB** (gamepad) to target whatever sits under the center of the screen; taps on mobile can also target nearby characters and crates. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers. The HUD stays clean until you open the tabbed menu with **M** (keyboard), **Y** (gamepad), or the top-right **☰ Menu** button on mobile.
+A two-zone prototype inspired by EverQuest's Freeport harbor. The Freeport city footprint is ~20x larger with multiple districts, and a connected **Freeport Desert** zone stretches east to an oasis filled with passive critters. Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Tap **Tab** (keyboard) or **RB** (gamepad) to target whatever sits under the center of the screen; taps on mobile can also target nearby characters and crates. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers. The HUD stays clean until you open the tabbed menu with **M** (keyboard), **Y** (gamepad), or the top-right **☰ Menu** button on mobile.
 
 ## Files you need
 - `index.html`: Loads the PlayCanvas engine from the CDN, mounts the canvas, and defines the tabbed menu shell.
-- `scripts/main.js`: Builds the Freeport scene, prevents walking through walls, adds interactive NPCs with a repeatable quest, and sets up camera controls (keyboard, gamepad, touch) plus the menu toggles.
-- `styles.css`: Full-viewport canvas styling and the modal menu layout.
+- `scripts/main.js`: Builds the Freeport + desert scenes, prevents walking through walls, adds interactive NPCs with a repeatable quest, EQ-style combat, passive desert wildlife, and sets up camera controls (keyboard, gamepad, touch) plus the menu toggles.
+- `styles.css`: Full-viewport canvas styling and the modal menu layout (including tabbed inventory/equipment lists).
 - `README.md`: This guide.
 
 ## Running locally
@@ -15,11 +14,12 @@ Open `index.html` in a modern browser (or serve the folder with any static serve
 - Walk within a few meters of an NPC to see their prompt, then press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
 - Left-click, press **Tab/RB**, or tap characters (NPCs, enemies, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
 - Quartermaster Ryn offers a repeatable **Dock Supply Run** quest. Accept it to gather the three marked crates around the docks, then return for your reward.
-- Combat uses EQ-inspired abilities: press **1** (keyboard), **East face** (gamepad), or tap **Attack** (mobile) for melee, and **2** for a ranged Ember Bolt. The training dummy and a dockside bat can be used to test combat; the bat starts passive, becomes hostile if attacked, and respawns 30 seconds after defeat with 20 HP.
+- Combat uses EQ-inspired abilities: press **1** (keyboard), **East face** (gamepad), or tap **Attack** (mobile) for melee, and **2** for a ranged Ember Bolt. The training dummy, a dockside bat, and passive desert skitters can be used to test combat; the bat starts passive, becomes hostile if attacked, and respawns 30 seconds after defeat with 20 HP.
+- Targeting and tabs: d-pad left/right (gamepad) or **Q/E** (keyboard) cycle the menu tabs when the menu is open.
 
-### Classes, stats, and menu tabs
+### Classes, stats, and gear
 - The sample character is a level 8 Ranger with classic EverQuest-style attributes (STR/STA/AGI/DEX/INT/WIS/CHA) plus HP, Mana, and AC.
-- Open the menu (M / Y / ☰) to view **Stats**, quest progress, inventory notes, and a **Help / Controls** tab.
+- The tabbed menu (M / Y / ☰) holds **Stats**, **Quests**, **Equipment**, **Inventory**, and **Help/Controls**. Equip items from the Inventory tab to move them into your worn gear and update your stats instantly.
 
 ## Git remote
 This workspace is configured with the GitHub remote:

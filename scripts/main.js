@@ -61,7 +61,12 @@ const palette = {
   cloth: new pc.Color(0.66, 0.52, 0.24),
   noble: new pc.Color(0.52, 0.24, 0.52),
   sailor: new pc.Color(0.24, 0.46, 0.74),
+  desertSand: new pc.Color(0.76, 0.69, 0.52),
+  oasisWater: new pc.Color(0.1, 0.44, 0.52),
 };
+
+const freeportScale = 20;
+const desertStartX = 1800;
 
 const eqClasses = {
   Warrior: {
@@ -80,6 +85,70 @@ const eqClasses = {
     baseMana: 120,
   },
 };
+
+const equipmentSlots = {
+  head: null,
+  chest: null,
+  legs: null,
+  feet: null,
+  hands: null,
+  mainhand: null,
+  offhand: null,
+  charm: null,
+};
+
+const inventory = [
+  {
+    id: 'rusty-cutlass',
+    name: 'Rusty Cutlass',
+    slot: 'mainhand',
+    stats: { STR: 2, DEX: 1 },
+    damage: '7-12',
+    note: 'Well-worn blade suited for dock skirmishes.',
+  },
+  {
+    id: 'oak-buckler',
+    name: 'Oak Buckler',
+    slot: 'offhand',
+    stats: { AC: 8, STA: 1 },
+    note: 'Light shield carved by Freeport carpenters.',
+  },
+  {
+    id: 'leather-tunic',
+    name: 'Ranger Leather Tunic',
+    slot: 'chest',
+    stats: { AC: 12, STA: 3, AGI: 1 },
+    note: 'Comfortable travelwear common among scouts.',
+  },
+  {
+    id: 'soft-boots',
+    name: 'Soft Leather Boots',
+    slot: 'feet',
+    stats: { AGI: 2, DEX: 1 },
+    note: 'Quiet soles ideal for stalking prey.',
+  },
+  {
+    id: 'mariner-gloves',
+    name: 'Mariner Gloves',
+    slot: 'hands',
+    stats: { STR: 1, DEX: 2 },
+    note: 'Salt-cured gloves favored on the docks.',
+  },
+  {
+    id: 'scout-cap',
+    name: 'Scout Cap',
+    slot: 'head',
+    stats: { AC: 6, AGI: 1 },
+    note: 'A stitched leather cap worn by scouts.',
+  },
+  {
+    id: 'sapphire-charm',
+    name: 'Sapphire Charm',
+    slot: 'charm',
+    stats: { CHA: 3, WIS: 2, Mana: 12 },
+    note: 'A calming trinket from distant merchants.',
+  },
+];
 
 const playerProfile = {
   name: 'Adventurer',
@@ -120,15 +189,33 @@ const abilityBook = {
   },
 };
 
+function gearBonuses() {
+  const totals = { STR: 0, STA: 0, AGI: 0, DEX: 0, INT: 0, WIS: 0, CHA: 0, AC: 0, HP: 0, Mana: 0 };
+  Object.values(equipmentSlots).forEach((item) => {
+    if (!item || !item.stats) return;
+    Object.entries(item.stats).forEach(([key, value]) => {
+      totals[key] = (totals[key] || 0) + value;
+    });
+  });
+  return totals;
+}
+
 function buildPlayerStats() {
   const cls = eqClasses[playerProfile.classKey];
-  const hp = cls.baseHP + playerProfile.level * 12;
-  const mana = cls.baseMana + playerProfile.level * 8;
+  const gear = gearBonuses();
+  const hp = cls.baseHP + playerProfile.level * 12 + (gear.HP || 0) + (gear.STA || 0) * 2;
+  const mana = cls.baseMana + playerProfile.level * 8 + (gear.Mana || 0) + (gear.WIS || 0) * 1.5;
   return {
-    ...cls.stats,
+    STR: cls.stats.STR + gear.STR,
+    STA: cls.stats.STA + gear.STA,
+    AGI: cls.stats.AGI + gear.AGI,
+    DEX: cls.stats.DEX + gear.DEX,
+    INT: cls.stats.INT + gear.INT,
+    WIS: cls.stats.WIS + gear.WIS,
+    CHA: cls.stats.CHA + gear.CHA,
     HP: hp,
     Mana: mana,
-    AC: 120 + Math.floor(playerProfile.level * 2.5),
+    AC: 120 + Math.floor(playerProfile.level * 2.5) + (gear.AC || 0),
   };
 }
 
@@ -152,6 +239,29 @@ const supplyQuest = {
   state: 'available', // available | active | ready
   reward: '2s + harbor favor',
 };
+
+function equipItem(item) {
+  if (!item || !item.slot) return;
+  const previous = equipmentSlots[item.slot];
+  equipmentSlots[item.slot] = item;
+  const index = inventory.findIndex((i) => i.id === item.id);
+  if (index !== -1) inventory.splice(index, 1);
+  if (previous) inventory.push(previous);
+  syncVitalsToGear();
+}
+
+function syncVitalsToGear() {
+  const stats = buildPlayerStats();
+  playerState.maxHealth = stats.HP;
+  playerState.maxMana = stats.Mana;
+  playerState.health = playerState.maxHealth;
+  playerState.mana = playerState.maxMana;
+  playerActor.health = playerState.health;
+  playerActor.maxHealth = playerState.maxHealth;
+  playerActor.mana = playerState.mana;
+  playerActor.maxMana = playerState.maxMana;
+  renderClassPanel();
+}
 
 function registerBoxCollider(position, size, padding = 0.6) {
   colliders.push({
@@ -339,6 +449,48 @@ function addBat(name, position) {
   return actor;
 }
 
+function addDesertSkitter(name, position) {
+  const root = new pc.Entity(name);
+  root.setLocalPosition(position.x, position.y, position.z);
+
+  const shell = new pc.Entity(`${name}-shell`);
+  shell.addComponent('render', { type: 'sphere' });
+  shell.setLocalScale(1.6, 0.9, 1.6);
+  shell.setLocalPosition(0, 0.9, 0);
+  shell.render.material = makeMaterial(new pc.Color(0.58, 0.48, 0.32), 0.05, 0.48);
+  shell.castShadows = true;
+
+  const legs = new pc.Entity(`${name}-legs`);
+  legs.addComponent('render', { type: 'cylinder' });
+  legs.setLocalScale(2.2, 0.2, 2.2);
+  legs.setLocalPosition(0, 0.35, 0);
+  legs.render.material = makeMaterial(new pc.Color(0.4, 0.32, 0.2), 0.05, 0.4);
+
+  root.addChild(shell);
+  root.addChild(legs);
+  app.root.addChild(root);
+
+  registerBoxCollider(position.clone().add(new pc.Vec3(0, 0.4, 0)), new pc.Vec3(2.2, 1, 2.2), 0.4);
+
+  const actor = createActor({
+    type: 'enemy',
+    name,
+    entity: root,
+    head: shell,
+    health: 20,
+    maxHealth: 20,
+    level: 5,
+    role: 'wanderer',
+    faction: 'Freeport Wildlife',
+    tags: ['enemy', 'desert'],
+    abilities: [abilityBook.enemyBite],
+    aggro: { passive: true, assistsOnHit: true },
+    respawn: { delay: 30, spawnPoint: position.clone() },
+  });
+
+  return actor;
+}
+
 function addQuestCrate(label, position) {
   const crate = new pc.Entity(label);
   crate.addComponent('render', { type: 'box' });
@@ -353,35 +505,42 @@ function addQuestCrate(label, position) {
 }
 
 // Build the Freeport-inspired zone
+
 function buildFreeportLanding() {
+  const areaScale = Math.sqrt(freeportScale);
+  const scaleSize = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
+  const scalePos = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
+
   // Ground and harbor water
-  addPlane('ground', new pc.Vec3(280, 1, 280), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
-  const water = addPlane('harbor-water', new pc.Vec3(200, 1, 160), new pc.Vec3(120, -0.3, 80), makeMaterial(palette.water, 0.1, 0.4));
+  addPlane('ground', scaleSize(new pc.Vec3(280, 1, 280)), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
+  addPlane('north-fields', scaleSize(new pc.Vec3(280, 1, 140)), new pc.Vec3(0, 0.02, -220 * areaScale), makeMaterial(palette.sand, 0, 0.9));
+  const water = addPlane('harbor-water', scaleSize(new pc.Vec3(200, 1, 160)), scalePos(new pc.Vec3(120, -0.3, 80)), makeMaterial(palette.water, 0.1, 0.4));
   water.render.castShadows = false;
 
   // City walls
   const wallMat = makeMaterial(palette.stone, 0, 0.7);
   const wallHeight = 12;
   const wallThickness = 4;
-  const extent = 120;
+  const extent = 120 * areaScale;
   addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat, true);
   addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat, true);
   addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat, true);
 
   // Gate and watchtowers facing the harbor
-  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10), wallMat, true);
+  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10 * areaScale), wallMat, false);
   addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6), true);
   addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6), true);
 
   // Docks and pier
   const dockMat = makeMaterial(palette.wood, 0.05, 0.65);
-  addBox('main-dock', new pc.Vec3(60, 1.2, 12), new pc.Vec3(extent + 24, 0.6, 24), dockMat, true);
-  addBox('pier-a', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 40, 0.5, 44), dockMat, true);
-  addBox('pier-b', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 8, 0.5, 44), dockMat, true);
+  addBox('main-dock', new pc.Vec3(60 * areaScale, 1.2, 12 * areaScale), new pc.Vec3(extent + 24 * areaScale, 0.6, 24 * areaScale), dockMat, true);
+  addBox('pier-a', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(extent + 40 * areaScale, 0.5, 44 * areaScale), dockMat, true);
+  addBox('pier-b', new pc.Vec3(10 * areaScale, 1, 40 * areaScale), new pc.Vec3(extent + 8 * areaScale, 0.5, 44 * areaScale), dockMat, true);
 
   // Central plaza
-  addPlane('plaza', new pc.Vec3(80, 1, 80), new pc.Vec3(-20, 0.05, 10), makeMaterial(palette.plaster, 0, 0.95));
-  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(-20, 5, 10), makeMaterial(palette.roof, 0.15, 0.4), true);
+  const plazaPos = scalePos(new pc.Vec3(-20, 0.05, 10));
+  addPlane('plaza', scaleSize(new pc.Vec3(80, 1, 80)), plazaPos, makeMaterial(palette.plaster, 0, 0.95));
+  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(plazaPos.x, 5, plazaPos.z), makeMaterial(palette.roof, 0.15, 0.4), true);
 
   // Inns and market stalls
   const houseMat = makeMaterial(palette.plaster, 0, 0.82);
@@ -393,53 +552,78 @@ function buildFreeportLanding() {
     { pos: new pc.Vec3(30, 3, 30), size: new pc.Vec3(22, 7, 16) },
   ];
   homes.forEach((home, i) => {
-    const base = addBox(`home-${i}`, home.size, home.pos, houseMat, true);
-    addBox(`home-${i}-roof`, new pc.Vec3(home.size.x * 1.05, home.size.y * 0.3, home.size.z * 1.05), new pc.Vec3(home.pos.x, home.pos.y + home.size.y * 0.6, home.pos.z), roofMat);
+    const pos = scalePos(home.pos);
+    const size = scaleSize(home.size);
+    const base = addBox(`home-${i}`, size, pos, houseMat, true);
+    addBox(
+      `home-${i}-roof`,
+      new pc.Vec3(size.x * 1.05, size.y * 0.3, size.z * 1.05),
+      new pc.Vec3(pos.x, pos.y + size.y * 0.6, pos.z),
+      roofMat
+    );
     base.render.castShadows = true;
   });
 
-  // Hall and barracks near the gate
-  addBox('hall', new pc.Vec3(32, 10, 18), new pc.Vec3(60, 5, -20), houseMat, true);
-  addBox('hall-roof', new pc.Vec3(34, 3, 20), new pc.Vec3(60, 11.5, -20), roofMat);
-  addBox('barracks', new pc.Vec3(28, 8, 14), new pc.Vec3(40, 4, 24), houseMat, true);
-  addBox('barracks-roof', new pc.Vec3(30, 2.5, 16), new pc.Vec3(40, 9, 24), roofMat);
+  // Outlying districts for scale
+  const districtOffsets = [
+    new pc.Vec3(240, 0, -260),
+    new pc.Vec3(-320, 0, 180),
+    new pc.Vec3(420, 0, 220),
+    new pc.Vec3(-180, 0, -360),
+    new pc.Vec3(620, 0, -120),
+  ];
+  districtOffsets.forEach((offset, idx) => {
+    const anchor = scalePos(offset);
+    addPlane(`district-${idx}-road`, new pc.Vec3(40, 1, 90), new pc.Vec3(anchor.x, 0.04, anchor.z), makeMaterial(palette.plaster, 0, 0.9));
+    addBox(`district-${idx}-hall`, new pc.Vec3(28, 8, 14), new pc.Vec3(anchor.x + 12, 4, anchor.z + 12), houseMat, true);
+    addBox(`district-${idx}-hall-roof`, new pc.Vec3(30, 2.5, 16), new pc.Vec3(anchor.x + 12, 9, anchor.z + 12), roofMat);
+    addBox(`district-${idx}-home`, new pc.Vec3(18, 7, 16), new pc.Vec3(anchor.x - 14, 3.5, anchor.z - 8), houseMat, true);
+    addBox(`district-${idx}-home-roof`, new pc.Vec3(20, 2.4, 18), new pc.Vec3(anchor.x - 14, 9.2, anchor.z - 8), roofMat);
+    addCylinder(`district-${idx}-tower`, 5, 14, new pc.Vec3(anchor.x + 20, 7, anchor.z - 24), makeMaterial(palette.stone, 0, 0.6), true);
+  });
 
-  // Pathways
+  // Hall and barracks near the gate
+  addBox('hall', new pc.Vec3(32, 10, 18), scalePos(new pc.Vec3(60, 5, -20)), houseMat, true);
+  addBox('hall-roof', new pc.Vec3(34, 3, 20), scalePos(new pc.Vec3(60, 11.5, -20)), roofMat);
+  addBox('barracks', new pc.Vec3(28, 8, 14), scalePos(new pc.Vec3(40, 4, 24)), houseMat, true);
+  addBox('barracks-roof', new pc.Vec3(30, 2.5, 16), scalePos(new pc.Vec3(40, 9, 24)), roofMat);
+
+  // Pathways and highways toward the desert
   const pathMat = makeMaterial(new pc.Color(0.46, 0.43, 0.38), 0, 0.95);
-  addPlane('main-road', new pc.Vec3(20, 1, 200), new pc.Vec3(60, 0.04, 0), pathMat);
-  addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
-  addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
+  addPlane('main-road', new pc.Vec3(20, 1, 200 * areaScale), new pc.Vec3(extent * 0.6, 0.04, 0), pathMat);
+  addPlane('plaza-road', new pc.Vec3(60 * areaScale, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
+  addPlane('plaza-road-west', new pc.Vec3(16, 1, 80 * areaScale), scalePos(new pc.Vec3(-40, 0.04, 10)), pathMat);
+  addPlane('desert-road', new pc.Vec3(desertStartX - extent, 1, 18), new pc.Vec3((desertStartX + extent) * 0.5, 0.04, -8), pathMat);
 
   // NPCs and interactables
-  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), { torso: palette.sailor, legs: palette.stone, skin: new pc.Color(0.93, 0.83, 0.7) }, [
+  addNPC('Dockhand Mira', scalePos(new pc.Vec3(110, 0, 30)), { torso: palette.sailor, legs: palette.stone, skin: new pc.Color(0.93, 0.83, 0.7) }, [
     'Busy day at the docks. Ships from Qeynos arrived at dawn.',
     'If you head inland, watch for the market patrols—they keep things tidy.',
   ]);
   addNPC(
     'Quartermaster Ryn',
-    new pc.Vec3(40, 0, -14),
-    { torso: palette.cloth, legs: palette.stone, skin: new pc.Color(0.86, 0.76, 0.64) },
+    scalePos(new pc.Vec3(40, 0, -14)),
+    { torso: palette.cloth, legs: palette.sand, skin: new pc.Color(0.86, 0.73, 0.55) },
     [
-      'Supplies are thin, but the Freeport guard always gets first pick.',
-      'Need armor? The smithy by the north wall can size you up.',
+      'The Freeport docks run on crates and coin. Want work? I pay for secured cargo.',
+      'Claim three marked supply crates and you will have my thanks and silver.',
     ],
-    { questGiver: true }
+    { offersQuest: true }
   );
-  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), { torso: palette.noble, legs: palette.roof, skin: new pc.Color(0.9, 0.8, 0.72) }, [
-    'The sea breeze carries whispers of distant isles.',
-    'When the bells toll at dusk, the harbor gates close—plan your return.',
+  addNPC('Archivist Rella', scalePos(new pc.Vec3(-10, 0, 32)), { torso: palette.noble, legs: palette.cloth, skin: new pc.Color(0.78, 0.66, 0.62) }, [
+    'Our maps are rough sketches—the desert east of here is undercharted.',
+    'If you explore the dunes, mark the oasis on your map for us.',
   ]);
-
-  addNPC('Guard Veylan', new pc.Vec3(-12, 0, 6), { torso: palette.stone, legs: palette.roof, skin: new pc.Color(0.72, 0.63, 0.55) }, [
+  addNPC('Guard Veylan', scalePos(new pc.Vec3(-12, 0, 6)), { torso: palette.stone, legs: palette.roof, skin: new pc.Color(0.72, 0.63, 0.55) }, [
     'Stay clear of troublemaker alleys—my patrol covers the plaza.',
     'If you spot loose crates, report back to Quartermaster Ryn.',
   ], { health: 180 });
 
-  addQuestCrate('Supply Crate A', new pc.Vec3(70, 0, -6));
-  addQuestCrate('Supply Crate B', new pc.Vec3(94, 0, 34));
-  addQuestCrate('Supply Crate C', new pc.Vec3(54, 0, 46));
+  addQuestCrate('Supply Crate A', scalePos(new pc.Vec3(70, 0, -6)));
+  addQuestCrate('Supply Crate B', scalePos(new pc.Vec3(94, 0, 34)));
+  addQuestCrate('Supply Crate C', scalePos(new pc.Vec3(54, 0, 46)));
 
-  const dummy = addCylinder('Training Dummy', 3, 8, new pc.Vec3(-28, 4, 12), makeMaterial(new pc.Color(0.45, 0.32, 0.2), 0.05, 0.6), true);
+  const dummy = addCylinder('Training Dummy', 3, 8, scalePos(new pc.Vec3(-28, 4, 12)), makeMaterial(new pc.Color(0.45, 0.32, 0.2), 0.05, 0.6), true);
   createActor({
     type: 'enemy',
     name: 'Training Dummy',
@@ -453,10 +637,39 @@ function buildFreeportLanding() {
     tags: ['enemy'],
   });
 
-  addBat('Dockside Bat', new pc.Vec3(108, 1.2, 64));
+  addBat('Dockside Bat', scalePos(new pc.Vec3(108, 1.2, 64)));
 }
 
 buildFreeportLanding();
+function buildFreeportDesert() {
+  const areaScale = Math.sqrt(freeportScale);
+  const desertBase = new pc.Vec3(desertStartX, 0, 0);
+  const oasisOffset = new pc.Vec3(900, 0, 420);
+
+  addPlane('desert-ground', new pc.Vec3(260 * areaScale, 1, 260 * areaScale), desertBase, makeMaterial(palette.desertSand, 0, 0.95));
+  addPlane('dune-ridge', new pc.Vec3(240 * areaScale, 2.5, 30 * areaScale), new pc.Vec3(desertBase.x + 240, 1.2, desertBase.z - 80), makeMaterial(palette.desertSand, 0, 0.92));
+
+  const oasisCenter = desertBase.clone().add(oasisOffset);
+  const water = addPlane('oasis-water', new pc.Vec3(60, 1, 60), new pc.Vec3(oasisCenter.x, -0.4, oasisCenter.z), makeMaterial(palette.oasisWater, 0.15, 0.2));
+  water.render.castShadows = false;
+  addPlane('oasis-grass', new pc.Vec3(80, 1, 80), new pc.Vec3(oasisCenter.x, 0.02, oasisCenter.z), makeMaterial(new pc.Color(0.32, 0.44, 0.3), 0, 0.8));
+  addCylinder('oasis-palm', 1.2, 12, new pc.Vec3(oasisCenter.x - 6, 6, oasisCenter.z + 4), makeMaterial(palette.wood, 0.05, 0.55), true);
+  addCylinder('oasis-palm-2', 1, 11, new pc.Vec3(oasisCenter.x + 8, 5.5, oasisCenter.z - 3), makeMaterial(palette.wood, 0.05, 0.55), true);
+
+  const boulders = [
+    new pc.Vec3(desertBase.x + 160, 1, desertBase.z + 30),
+    new pc.Vec3(desertBase.x + 320, 1, desertBase.z - 120),
+    new pc.Vec3(desertBase.x + 520, 1, desertBase.z + 180),
+  ];
+  boulders.forEach((pos, i) => addBox(`desert-boulder-${i}`, new pc.Vec3(18, 12, 14), pos, makeMaterial(palette.stone, 0, 0.65), true));
+
+  addDesertSkitter('Oasis Scarab', new pc.Vec3(oasisCenter.x + 12, 0.6, oasisCenter.z + 18));
+  addDesertSkitter('Dune Forager', new pc.Vec3(desertBase.x + 260, 0.6, desertBase.z - 90));
+  addDesertSkitter('Sand Hopper', new pc.Vec3(desertBase.x + 420, 0.6, desertBase.z + 210));
+}
+
+buildFreeportDesert();
+
 
 // Player movement handling
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -498,10 +711,24 @@ const playerActor = createActor({
   abilities: [abilityBook.slash, abilityBook.emberBolt],
 });
 
+function equipStarterSet() {
+  ['leather-tunic', 'soft-boots', 'mariner-gloves', 'rusty-cutlass', 'oak-buckler', 'sapphire-charm'].forEach((id) => {
+    const item = inventory.find((i) => i.id === id);
+    if (item) equipItem(item);
+  });
+}
+
+equipStarterSet();
+syncVitalsToGear();
+
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'm') {
     toggleMenu();
+  }
+  if (menuOpen && (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'e')) {
+    e.preventDefault();
+    stepTab(e.key.toLowerCase() === 'e' ? 1 : -1);
   }
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
@@ -528,6 +755,7 @@ let previousGamepadSouth = false;
 let previousGamepadY = false;
 let previousGamepadEast = false;
 let previousGamepadRB = false;
+let previousGamepadDpadX = 0;
 
 function applyGamepadLook(dt) {
   if (menuOpen) return;
@@ -584,6 +812,21 @@ function pollGamepadTarget() {
   const rb = !!(pad.buttons[5] && pad.buttons[5].pressed);
   if (rb && !previousGamepadRB) selectFromCrosshair();
   previousGamepadRB = rb;
+}
+
+function pollGamepadTabbing() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadDpadX = 0;
+    return;
+  }
+  const left = !!(pad.buttons[14] && pad.buttons[14].pressed);
+  const right = !!(pad.buttons[15] && pad.buttons[15].pressed);
+  const axis = right ? 1 : left ? -1 : 0;
+  if (axis !== 0 && previousGamepadDpadX === 0 && menuOpen) {
+    stepTab(axis);
+  }
+  previousGamepadDpadX = axis;
 }
 
 function readGamepadMove() {
@@ -762,6 +1005,7 @@ const classPanelEl = document.getElementById('classPanel');
 const questStatusEl = document.getElementById('questStatus');
 const helpContentEl = document.getElementById('helpContent');
 const inventoryContentEl = document.getElementById('inventoryContent');
+const equipmentContentEl = document.getElementById('equipmentContent');
 const nameplateEl = document.getElementById('nameplate');
 const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
 const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
@@ -771,6 +1015,7 @@ const menuToggleBtn = document.getElementById('menuToggle');
 const menuCloseBtn = document.getElementById('menuClose');
 const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+let previousTabIndex = 0;
 
 const queueInteract = () => {
   interactionQueued = true;
@@ -805,6 +1050,18 @@ tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => setTab(btn.dataset.tab));
 });
 
+inventoryContentEl.addEventListener('click', (e) => {
+  const target = e.target.closest('.equip-btn');
+  if (!target) return;
+  const itemId = target.dataset.item;
+  const item = inventory.find((i) => i.id === itemId);
+  if (item) {
+    equipItem(item);
+    renderEquipmentPanel();
+    updateInventoryPanel();
+  }
+});
+
 function setTab(tab) {
   tabButtons.forEach((btn) => {
     const active = btn.dataset.tab === tab;
@@ -814,6 +1071,13 @@ function setTab(tab) {
   tabPanels.forEach((panel) => {
     panel.classList.toggle('active', panel.id === `tab-${tab}`);
   });
+  previousTabIndex = tabButtons.findIndex((b) => b.dataset.tab === tab);
+}
+
+function stepTab(direction) {
+  const nextIndex = (previousTabIndex + direction + tabButtons.length) % tabButtons.length;
+  const nextTab = tabButtons[nextIndex];
+  if (nextTab) setTab(nextTab.dataset.tab);
 }
 
 function openMenu() {
@@ -844,29 +1108,68 @@ function renderHelpPanel() {
     <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu.</div>
     <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, East face to attack, <strong>RB</strong> to target at crosshair, Y to open menu.</div>
     <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap target or use Interact, <strong>Attack</strong> for combat, top menu button for panels.</div>
+    <div><strong>Menu Tabs</strong>: Use mouse/touch to click tabs, press Q/E on keyboard to cycle, or d-pad left/right on gamepad.</div>
+  `;
+}
+
+function statLine(stats = {}) {
+  const parts = Object.entries(stats).map(([k, v]) => `${k} +${v}`);
+  return parts.length ? parts.join(' · ') : 'No bonuses';
+}
+
+function renderEquipmentPanel() {
+  const lines = Object.entries(equipmentSlots).map(([slot, item]) => {
+    if (!item) return `<li><strong>${slot}</strong>: Empty</li>`;
+    return `<li><strong>${slot}</strong>: ${item.name} <span class="subtle">(${statLine(item.stats)})</span></li>`;
+  });
+  equipmentContentEl.innerHTML = `
+    <div class="card-body">Equipped gear applies bonuses to your stats. Swap pieces to see totals update instantly.</div>
+    <ul class="stack-list">${lines.join('')}</ul>
   `;
 }
 
 function updateInventoryPanel() {
-  if (supplyQuest.state === 'active' || supplyQuest.state === 'ready') {
-    inventoryContentEl.textContent = `Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}`;
-  } else {
-    inventoryContentEl.textContent = 'Your satchel is light. Pick up supply crates to see loot tracked here.';
-  }
+  const questLine =
+    supplyQuest.state === 'active' || supplyQuest.state === 'ready'
+      ? `<div class="card-body subtle">Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}</div>`
+      : `<div class="card-body subtle">Pick up marked crates around the docks to fill this quest.</div>`;
+
+  const bag = inventory
+    .map((item) => {
+      const equipLabel = item.slot ? `<button class="equip-btn" data-item="${item.id}">Equip to ${item.slot}</button>` : '';
+      return `
+        <li>
+          <div class="item-line"><strong>${item.name}</strong> <span class="subtle">${item.slot || 'Consumable'}</span></div>
+          <div class="subtle">${item.note || ''}</div>
+          <div class="statline">${statLine(item.stats)}</div>
+          ${equipLabel}
+        </li>
+      `;
+    })
+    .join('');
+
+  inventoryContentEl.innerHTML = `
+    <div class="card-body">Backpack slots ready for loot and spare gear. Equip pieces to move them into your worn set.</div>
+    ${questLine}
+    <ul class="stack-list">${bag || '<li>Your pack is empty.</li>'}</ul>
+  `;
 }
 
 function updateHud() {
   const p = camera.getPosition();
-  posLabel.textContent = `Freeport · ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
+  const zone = p.x > desertStartX - 120 ? 'Freeport Desert' : 'Freeport';
+  posLabel.textContent = `${zone} · ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
 
 function renderClassPanel() {
   const stats = buildPlayerStats();
+  const gear = gearBonuses();
   const lines = [
     `<strong>${playerProfile.name}</strong> — Level ${playerProfile.level} ${playerProfile.classKey}`,
     `HP ${Math.round(playerState.health)}/${stats.HP} · Mana ${Math.round(playerState.mana)}/${stats.Mana} · AC ${stats.AC}`,
     `STR ${stats.STR} · STA ${stats.STA} · AGI ${stats.AGI} · DEX ${stats.DEX}`,
     `INT ${stats.INT} · WIS ${stats.WIS} · CHA ${stats.CHA}`,
+    `<span class="subtle">Gear bonuses: ${statLine(gear)}</span>`,
   ];
   classPanelEl.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
 }
@@ -1250,6 +1553,7 @@ function collides(position) {
 app.on('update', (dt) => {
   pollGamepadMenuToggle();
   if (menuOpen) {
+    pollGamepadTabbing();
     updateNameplatePosition();
     return;
   }
@@ -1346,6 +1650,7 @@ app.on('update', (dt) => {
 renderClassPanel();
 renderHelpPanel();
 updateQuestStatus();
+renderEquipmentPanel();
 setTab('stats');
 updateHud();
 app.start();

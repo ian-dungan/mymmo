@@ -134,6 +134,36 @@ canvas {
   margin-top: 8px;
 }
 
+.stack-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.item-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.statline {
+  color: #8fb0d8;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.equip-btn {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(126, 195, 255, 0.1);
+  color: #e7f0ff;
+  cursor: pointer;
+}
+
 .dialogue {
   position: fixed;
   left: 16px;
