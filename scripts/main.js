@@ -506,6 +506,10 @@ window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
   if (e.key.toLowerCase() === 'e') interactionQueued = true;
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    selectFromCrosshair();
+  }
   if (e.key === '1') queuePrimaryAttack();
   if (e.key === '2') queueSecondaryAttack();
 });
@@ -523,6 +527,7 @@ function readGamepad() {
 let previousGamepadSouth = false;
 let previousGamepadY = false;
 let previousGamepadEast = false;
+let previousGamepadRB = false;
 
 function applyGamepadLook(dt) {
   if (menuOpen) return;
@@ -568,6 +573,17 @@ function pollGamepadAttack() {
   const east = !!(pad.buttons[2] && pad.buttons[2].pressed);
   if (east && !previousGamepadEast) queuePrimaryAttack();
   previousGamepadEast = east;
+}
+
+function pollGamepadTarget() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadRB = false;
+    return;
+  }
+  const rb = !!(pad.buttons[5] && pad.buttons[5].pressed);
+  if (rb && !previousGamepadRB) selectFromCrosshair();
+  previousGamepadRB = rb;
 }
 
 function readGamepadMove() {
@@ -825,9 +841,9 @@ function toggleMenu() {
 
 function renderHelpPanel() {
   helpContentEl.innerHTML = `
-    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu.</div>
-    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, East face to attack, Y to open menu.</div>
-    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, Interact for talking/looting, <strong>Attack</strong> for combat, top menu button for panels.</div>
+    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu.</div>
+    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, East face to attack, <strong>RB</strong> to target at crosshair, Y to open menu.</div>
+    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap target or use Interact, <strong>Attack</strong> for combat, top menu button for panels.</div>
   `;
 }
 
@@ -870,8 +886,9 @@ function getHeadPosition(actor) {
   if (actor.type === 'player') {
     return camera.getPosition().clone().add(new pc.Vec3(0, 1.8, 0));
   }
-  if (actor.head) return actor.head.getWorldPosition();
-  return actor.entity.getPosition();
+  if (actor.head && actor.head.getPosition) return actor.head.getPosition().clone();
+  if (actor.entity && actor.entity.getPosition) return actor.entity.getPosition().clone();
+  return new pc.Vec3();
 }
 
 function updateNameplatePosition() {
@@ -897,6 +914,12 @@ function updateNameplatePosition() {
 function selectActor(actor) {
   selectedTarget = actor;
   updateNameplatePosition();
+}
+
+function selectFromCrosshair() {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  handlePointerSelect(cx, cy);
 }
 
 function pickTargetAtScreen(clientX, clientY) {
@@ -1236,6 +1259,7 @@ app.on('update', (dt) => {
   applyTouchLook(dt);
   pollGamepadInteract();
   pollGamepadAttack();
+  pollGamepadTarget();
   handleQueuedAbility();
 
   // build local basis

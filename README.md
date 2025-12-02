@@ -1,6 +1,6 @@
 # Freeport Landing (PlayCanvas)
 A single-zone prototype inspired by EverQuest's Freeport harbor. Walk the docks, city walls, and plaza to test controls and scale.
-Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers. The HUD stays clean until you open the tabbed menu with **M** (keyboard), **Y** (gamepad), or the top-right **☰ Menu** button on mobile.
+Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Tap **Tab** (keyboard) or **RB** (gamepad) to target whatever sits under the center of the screen; taps on mobile can also target nearby characters and crates. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers. The HUD stays clean until you open the tabbed menu with **M** (keyboard), **Y** (gamepad), or the top-right **☰ Menu** button on mobile.
 
 ## Files you need
 - `index.html`: Loads the PlayCanvas engine from the CDN, mounts the canvas, and defines the tabbed menu shell.
@@ -13,7 +13,7 @@ Open `index.html` in a modern browser (or serve the folder with any static serve
 
 ### Talking to NPCs, selecting targets, and fighting
 - Walk within a few meters of an NPC to see their prompt, then press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
-- Left-click or tap characters (NPCs, enemies, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
+- Left-click, press **Tab/RB**, or tap characters (NPCs, enemies, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
 - Quartermaster Ryn offers a repeatable **Dock Supply Run** quest. Accept it to gather the three marked crates around the docks, then return for your reward.
 - Combat uses EQ-inspired abilities: press **1** (keyboard), **East face** (gamepad), or tap **Attack** (mobile) for melee, and **2** for a ranged Ember Bolt. The training dummy and a dockside bat can be used to test combat; the bat starts passive, becomes hostile if attacked, and respawns 30 seconds after defeat with 20 HP.
 
