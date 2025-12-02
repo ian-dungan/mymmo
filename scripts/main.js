@@ -586,6 +586,7 @@ function buildFreeportLanding() {
   const areaScale = Math.sqrt(freeportScale);
   const scaleSize = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
   const scalePos = (vec) => new pc.Vec3(vec.x * areaScale, vec.y, vec.z * areaScale);
+  const extent = 120 * areaScale;
 
   // Ground and harbor water
   addPlane('ground', scaleSize(new pc.Vec3(280, 1, 280)), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
@@ -601,7 +602,6 @@ function buildFreeportLanding() {
   const wallMat = makeMaterial(palette.stone, 0, 0.7);
   const wallHeight = 12;
   const wallThickness = 4;
-  const extent = 120 * areaScale;
   addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat, true);
   addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat, true);
   addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat, true);
