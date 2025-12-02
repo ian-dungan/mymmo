@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freeport Landing - PlayCanvas</title>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2313181a'/%3E%3Cpath d='M12 48L32 12l20 36H12z' fill='%23d7c38a'/%3E%3Cpath d='M24 40h16l-8-14-8 14z' fill='%23335c85'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://code.playcanvas.com/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <button id="menuToggle" class="menu-toggle" aria-label="Open menu">☰ Menu</button>
+
+  <div id="gameMenu" class="menu hidden" role="dialog" aria-modal="true" aria-label="Game menu">
+    <div class="menu-header">
+      <div class="menu-title">Freeport Landing</div>
+      <div class="tab-bar" role="tablist">
+        <button class="tab-button active" data-tab="stats" role="tab" aria-selected="true">Stats</button>
+        <button class="tab-button" data-tab="quests" role="tab" aria-selected="false">Quests</button>
+        <button class="tab-button" data-tab="help" role="tab" aria-selected="false">Help / Controls</button>
+        <button class="tab-button" data-tab="inventory" role="tab" aria-selected="false">Inventory</button>
+      </div>
+      <button id="menuClose" class="menu-close" aria-label="Close menu">×</button>
+    </div>
+    <div class="menu-content">
+      <section id="tab-stats" class="tab-panel active" role="tabpanel">
+        <div id="classPanel" class="card-body"></div>
+        <div class="card-body subtle" id="playerPos">0,0,0</div>
+      </section>
+      <section id="tab-quests" class="tab-panel" role="tabpanel">
+        <div id="questStatus" class="card-body">No active quests. Speak to Quartermaster Ryn.</div>
+      </section>
+      <section id="tab-help" class="tab-panel" role="tabpanel">
+        <div class="card-body" id="helpContent"></div>
+      </section>
+      <section id="tab-inventory" class="tab-panel" role="tabpanel">
+        <div id="inventoryContent" class="card-body">Your satchel is light. Pick up supply crates to see loot tracked here.</div>
+      </section>
+    </div>
+  </div>
+
+  <div id="interactionHint" class="interaction hidden">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</div>
+  <div id="dialogue" class="dialogue hidden">
+    <div class="dialogue-name"></div>
+    <div class="dialogue-text"></div>
+  </div>
+  <div id="nameplate" class="nameplate hidden" aria-live="polite">
+    <div class="nameplate-name"></div>
+    <div class="nameplate-health">
+      <div class="health-bar"></div>
+    </div>
+    <div class="nameplate-health-text"></div>
+  </div>
+  <div class="touch-ui">
+    <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <button id="interact-button" class="interact-button" aria-label="Interact">Interact</button>
+  </div>
+  <canvas id="application-canvas"></canvas>
+  <script src="scripts/main.js"></script>
+</body>
+</html>
