@@ -103,6 +103,8 @@ function buildPlayerStats() {
 const colliders = [];
 const npcs = [];
 const actors = [];
+const actorRegistry = new Map();
+let actorIdCounter = 0;
 const questCrates = [];
 
 const supplyQuest = {
@@ -123,8 +125,25 @@ function registerBoxCollider(position, size, padding = 0.6) {
   });
 }
 
-function registerActor(actor) {
+function createActor(config) {
+  const id = config.id || `${config.type || 'actor'}-${++actorIdCounter}`;
+  const maxHealth = config.maxHealth ?? config.health ?? 120;
+  const actor = {
+    id,
+    type: config.type || 'npc',
+    name: config.name || 'Unnamed',
+    entity: config.entity,
+    head: config.head || config.entity,
+    level: config.level ?? 1,
+    role: config.role || 'wanderer',
+    faction: config.faction || 'neutral',
+    tags: config.tags || [],
+    maxHealth,
+    health: config.health ?? maxHealth,
+  };
   actors.push(actor);
+  actorRegistry.set(id, actor);
+  return actor;
 }
 
 function addBox(name, size, position, material, withCollider = false) {
@@ -207,21 +226,26 @@ function buildHumanoid(name, position, colors) {
 
 function addNPC(name, position, colors, dialogLines, options = {}) {
   const humanoid = buildHumanoid(name, position, colors);
-  npcs.push({
-    entity: humanoid.root,
-    name,
-    dialogLines,
-    lineIndex: 0,
-    ...options,
-  });
-
-  registerActor({
+  const actor = createActor({
     type: 'npc',
     name,
     entity: humanoid.root,
     head: humanoid.head,
     health: options.health || 140,
     maxHealth: options.health || 140,
+    level: options.level || 6,
+    role: options.role || 'citizen',
+    faction: options.faction || 'Freeport',
+    tags: ['npc'],
+  });
+
+  npcs.push({
+    entity: humanoid.root,
+    name,
+    dialogLines,
+    lineIndex: 0,
+    actorId: actor.id,
+    ...options,
   });
 }
 
@@ -326,13 +350,17 @@ function buildFreeportLanding() {
   addQuestCrate('Supply Crate C', new pc.Vec3(54, 0, 46));
 
   const dummy = addCylinder('Training Dummy', 3, 8, new pc.Vec3(-28, 4, 12), makeMaterial(new pc.Color(0.45, 0.32, 0.2), 0.05, 0.6), true);
-  registerActor({
+  createActor({
     type: 'enemy',
     name: 'Training Dummy',
     entity: dummy,
     head: dummy, // top of cylinder works for nameplate
     health: 80,
     maxHealth: 80,
+    level: 3,
+    role: 'practice target',
+    faction: 'neutral',
+    tags: ['enemy'],
   });
 }
 
@@ -355,15 +383,17 @@ let selectedTarget = null;
 let menuOpen = false;
 const screenPos = new pc.Vec3();
 const playerStats = buildPlayerStats();
-const playerActor = {
+const playerActor = createActor({
   type: 'player',
   name: `${playerProfile.name} (You)`,
   entity: camera,
   head: null,
   health: playerStats.HP,
   maxHealth: playerStats.HP,
-};
-registerActor(playerActor);
+  level: playerProfile.level,
+  role: playerProfile.classKey,
+  tags: ['player'],
+});
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
@@ -503,8 +533,18 @@ function handleTouchMove(e) {
 
 function handleTouchEnd(e) {
   for (const touch of e.changedTouches) {
-    if (touch.identifier === touchState.move.id) resetStick('move');
-    if (touch.identifier === touchState.look.id) resetStick('look');
+    const isMove = touch.identifier === touchState.move.id;
+    const isLook = touch.identifier === touchState.look.id;
+    const ref = isMove ? touchState.move : isLook ? touchState.look : null;
+    const delta = ref && ref.start ? { x: touch.clientX - ref.start.x, y: touch.clientY - ref.start.y } : { x: 0, y: 0 };
+    if (isMove) resetStick('move');
+    if (isLook) resetStick('look');
+
+    const tapDistance = Math.hypot(delta.x, delta.y);
+    const tapped = tapDistance < 12 && !menuOpen && !touch.target.closest('.menu, .menu-toggle, #interact-button');
+    if (tapped) {
+      handlePointerSelect(touch.clientX, touch.clientY);
+    }
   }
 }
 
@@ -550,6 +590,10 @@ canvas.addEventListener('mousedown', (e) => {
 
 canvas.addEventListener('touchend', (e) => {
   for (const touch of e.changedTouches) {
+    const isMove = touch.identifier === touchState.move.id;
+    const isLook = touch.identifier === touchState.look.id;
+    if (isMove || isLook || menuOpen) continue;
+    if (touch.target.closest('.menu, .menu-toggle, #interact-button')) continue;
     handlePointerSelect(touch.clientX, touch.clientY);
   }
 });
@@ -719,9 +763,10 @@ function selectActor(actor) {
   updateNameplatePosition();
 }
 
-function handlePointerSelect(clientX, clientY) {
+function pickTargetAtScreen(clientX, clientY) {
   let closest = null;
-  let closestDist = 90;
+  let closestDist = 110;
+
   actors.forEach((actor) => {
     const worldPos = getHeadPosition(actor);
     camera.camera.worldToScreen(worldPos, screenPos);
@@ -730,15 +775,52 @@ function handlePointerSelect(clientX, clientY) {
     const dy = screenPos.y - clientY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < closestDist) {
-      closest = actor;
+      closest = { type: 'actor', ref: actor, dist };
       closestDist = dist;
     }
   });
-  if (closest) selectActor(closest);
+
+  questCrates.forEach((crate) => {
+    if (crate.collected && supplyQuest.state !== 'active') return;
+    const worldPos = crate.entity.getPosition().clone();
+    worldPos.y += 1.6;
+    camera.camera.worldToScreen(worldPos, screenPos);
+    if (screenPos.z < 0) return;
+    const dx = screenPos.x - clientX;
+    const dy = screenPos.y - clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < closestDist) {
+      closest = { type: 'crate', ref: crate, dist };
+      closestDist = dist;
+    }
+  });
+
+  return closest;
+}
+
+function handlePointerSelect(clientX, clientY) {
+  const target = pickTargetAtScreen(clientX, clientY);
+  if (!target) return;
+
+  if (target.type === 'actor') {
+    selectActor(target.ref);
+    if (target.ref.type === 'npc') {
+      const npc = npcForActor(target.ref);
+      if (npc) interactWithNPC(npc);
+    }
+  }
+
+  if (target.type === 'crate') {
+    interactWithCrate(target.ref);
+  }
 }
 
 function actorForEntity(entity) {
   return actors.find((a) => a.entity === entity) || null;
+}
+
+function npcForActor(actor) {
+  return npcs.find((n) => n.actorId === actor.id) || null;
 }
 
 function interactWithCrate(crate) {

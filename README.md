@@ -13,7 +13,7 @@ Open `index.html` in a modern browser (or serve the folder with any static serve
 
 ### Talking to NPCs and selecting targets
 - Walk within a few meters of an NPC to see their prompt, then press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
-- Left-click or tap characters (NPCs, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style.
+- Left-click or tap characters (NPCs, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
 - Quartermaster Ryn offers a repeatable **Dock Supply Run** quest. Accept it to gather the three marked crates around the docks, then return for your reward.
 
 ### Classes, stats, and menu tabs
