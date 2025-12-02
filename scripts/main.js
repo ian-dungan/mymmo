@@ -65,6 +65,25 @@ const palette = {
   oasisWater: new pc.Color(0.1, 0.44, 0.52),
 };
 
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+function mixColor(a, b, t, out = new pc.Color()) {
+  out.r = lerp(a.r, b.r, t);
+  out.g = lerp(a.g, b.g, t);
+  out.b = lerp(a.b, b.b, t);
+  return out;
+}
+
+const lanterns = [];
+const rotatingBeacons = [];
+let timeOfDay = 85; // seconds into the day cycle
+const dayDuration = 260; // seconds per full day/night
+const dayColor = new pc.Color(0.54, 0.66, 0.86);
+const duskColor = new pc.Color(0.13, 0.1, 0.18);
+const ambientDay = new pc.Color(0.32, 0.35, 0.4);
+const ambientNight = new pc.Color(0.08, 0.1, 0.14);
+const tmpColor = new pc.Color();
+
 const freeportScale = 20;
 const desertStartX = 1800;
 
@@ -340,6 +359,56 @@ function addPlane(name, size, position, material, withCollider = false) {
   return entity;
 }
 
+function addLantern(name, position, height = 7, range = 24) {
+  const post = new pc.Entity(`${name}-post`);
+  post.addComponent('render', { type: 'cylinder' });
+  post.setLocalScale(0.45, height, 0.45);
+  post.setLocalPosition(position.x, height / 2, position.z);
+  post.render.material = makeMaterial(palette.wood, 0.05, 0.6);
+
+  const cap = new pc.Entity(`${name}-cap`);
+  cap.addComponent('render', { type: 'cone' });
+  cap.setLocalScale(1, 1.2, 1);
+  cap.setLocalPosition(0, height * 0.55, 0);
+  cap.render.material = makeMaterial(palette.roof, 0, 0.45);
+  post.addChild(cap);
+
+  const glow = new pc.Entity(`${name}-glow`);
+  glow.addComponent('light', {
+    type: 'omni',
+    color: new pc.Color(1, 0.85, 0.63),
+    intensity: 0,
+    range,
+    castShadows: false,
+  });
+  glow.setLocalPosition(0, height * 0.65, 0);
+  post.addChild(glow);
+
+  lanterns.push(glow);
+  app.root.addChild(post);
+  return post;
+}
+
+function addLighthouse(name, position) {
+  const tower = addCylinder(name, 8, 38, new pc.Vec3(position.x, 19, position.z), makeMaterial(palette.stone, 0, 0.65), true);
+  addCylinder(`${name}-cap`, 10, 4, new pc.Vec3(position.x, 38, position.z), makeMaterial(palette.roof, 0, 0.4));
+  const beacon = new pc.Entity(`${name}-beacon`);
+  beacon.addComponent('light', {
+    type: 'spot',
+    color: new pc.Color(1, 0.92, 0.8),
+    intensity: 0,
+    range: 140,
+    innerConeAngle: 20,
+    outerConeAngle: 36,
+    castShadows: false,
+  });
+  beacon.setLocalPosition(position.x, 38, position.z);
+  beacon.setLocalEulerAngles(0, 35, 0);
+  rotatingBeacons.push({ entity: beacon, speed: 18 });
+  app.root.addChild(beacon);
+  return tower;
+}
+
 function buildHumanoid(name, position, colors) {
   const root = new pc.Entity(name);
   root.setLocalPosition(position.x, position.y, position.z);
@@ -523,6 +592,10 @@ function buildFreeportLanding() {
   addPlane('north-fields', scaleSize(new pc.Vec3(280, 1, 140)), new pc.Vec3(0, 0.02, -220 * areaScale), makeMaterial(palette.sand, 0, 0.9));
   const water = addPlane('harbor-water', scaleSize(new pc.Vec3(200, 1, 160)), scalePos(new pc.Vec3(120, -0.3, 80)), makeMaterial(palette.water, 0.1, 0.4));
   water.render.castShadows = false;
+  addLighthouse('harbor-lighthouse', scalePos(new pc.Vec3(168, 0, -48)));
+  addLantern('dock-lantern-a', scalePos(new pc.Vec3(extent + 14, 0, 46)));
+  addLantern('dock-lantern-b', scalePos(new pc.Vec3(extent + 52, 0, 30)));
+  addLantern('dock-lantern-c', scalePos(new pc.Vec3(extent + 24, 0, -12)));
 
   // City walls
   const wallMat = makeMaterial(palette.stone, 0, 0.7);
@@ -548,6 +621,9 @@ function buildFreeportLanding() {
   const plazaPos = scalePos(new pc.Vec3(-20, 0.05, 10));
   addPlane('plaza', scaleSize(new pc.Vec3(80, 1, 80)), plazaPos, makeMaterial(palette.plaster, 0, 0.95));
   addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(plazaPos.x, 5, plazaPos.z), makeMaterial(palette.roof, 0.15, 0.4), true);
+  addLantern('plaza-lantern-a', new pc.Vec3(plazaPos.x + 12, 0, plazaPos.z + 18));
+  addLantern('plaza-lantern-b', new pc.Vec3(plazaPos.x - 16, 0, plazaPos.z - 22));
+  addLantern('plaza-lantern-c', new pc.Vec3(plazaPos.x + 24, 0, plazaPos.z - 6));
 
   // Inns and market stalls
   const houseMat = makeMaterial(palette.plaster, 0, 0.82);
@@ -662,6 +738,14 @@ function buildFreeportDesert() {
   addPlane('oasis-grass', new pc.Vec3(80, 1, 80), new pc.Vec3(oasisCenter.x, 0.02, oasisCenter.z), makeMaterial(new pc.Color(0.32, 0.44, 0.3), 0, 0.8));
   addCylinder('oasis-palm', 1.2, 12, new pc.Vec3(oasisCenter.x - 6, 6, oasisCenter.z + 4), makeMaterial(palette.wood, 0.05, 0.55), true);
   addCylinder('oasis-palm-2', 1, 11, new pc.Vec3(oasisCenter.x + 8, 5.5, oasisCenter.z - 3), makeMaterial(palette.wood, 0.05, 0.55), true);
+  addLantern('oasis-lantern-a', new pc.Vec3(oasisCenter.x + 14, 0, oasisCenter.z + 6), 6, 20);
+  addLantern('oasis-lantern-b', new pc.Vec3(oasisCenter.x - 12, 0, oasisCenter.z - 10), 6, 20);
+
+  const campSpot = new pc.Vec3(oasisCenter.x - 22, 0, oasisCenter.z - 26);
+  addBox('oasis-tent-1', new pc.Vec3(12, 6, 10), new pc.Vec3(campSpot.x, 3, campSpot.z), makeMaterial(palette.cloth, 0, 0.5), true);
+  addBox('oasis-tent-2', new pc.Vec3(10, 5, 9), new pc.Vec3(campSpot.x + 18, 2.6, campSpot.z + 8), makeMaterial(palette.cloth, 0, 0.52), true);
+  addPlane('oasis-campfire', new pc.Vec3(6, 1, 6), new pc.Vec3(campSpot.x + 10, 0.12, campSpot.z + 2), makeMaterial(new pc.Color(0.4, 0.18, 0.1), 0, 0.4));
+  addLantern('oasis-campfire-light', new pc.Vec3(campSpot.x + 10, 0, campSpot.z + 2), 3.6, 16);
 
   const boulders = [
     new pc.Vec3(desertBase.x + 160, 1, desertBase.z + 30),
@@ -1586,6 +1670,41 @@ function showDialogue(name, line) {
   dialogueEl.classList.remove('hidden');
 }
 
+function updateDayNight(dt) {
+  timeOfDay = (timeOfDay + dt) % dayDuration;
+  const phase = (timeOfDay / dayDuration) * Math.PI * 2;
+  const elevation = clamp01(Math.sin(phase));
+  const daylight = clamp01(elevation);
+
+  const sunPitch = lerp(10, 75, daylight);
+  const sunYaw = (phase * 180) / Math.PI;
+  light.setLocalEulerAngles(sunPitch, sunYaw, 0);
+  light.light.intensity = lerp(0.2, 2.2, daylight);
+
+  mixColor(ambientNight, ambientDay, daylight, tmpColor);
+  app.scene.ambientLight.copy(tmpColor);
+  app.scene.exposure = lerp(0.8, 1.25, daylight);
+
+  mixColor(duskColor, dayColor, daylight, tmpColor);
+  camera.camera.clearColor.copy(tmpColor);
+
+  lanterns.forEach((lantern) => {
+    const targetIntensity = lerp(3.1, 0, daylight);
+    lantern.light.intensity = targetIntensity;
+    lantern.enabled = targetIntensity > 0.05;
+  });
+}
+
+function updateBeacons(dt) {
+  rotatingBeacons.forEach((beacon) => {
+    const euler = beacon.entity.getLocalEulerAngles();
+    euler.y += beacon.speed * dt;
+    beacon.entity.setLocalEulerAngles(euler);
+    const daylight = clamp01(Math.sin((timeOfDay / dayDuration) * Math.PI * 2));
+    beacon.entity.light.intensity = lerp(3, 0.6, daylight);
+  });
+}
+
 function collides(position) {
   for (const collider of colliders) {
     const dx = Math.abs(position.x - collider.center.x);
@@ -1598,6 +1717,8 @@ function collides(position) {
 }
 
 app.on('update', (dt) => {
+  updateDayNight(dt);
+  updateBeacons(dt);
   pollGamepadConfirmCancel();
   if (menuOpen) {
     pollGamepadTarget();
