@@ -1,3 +1,194 @@
+# Full Source Listings
+
+Copy-paste these into fresh files to restore the working prototype.
+
+---
+## index.html
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freeport Landing - PlayCanvas</title>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2313181a'/%3E%3Cpath d='M12 48L32 12l20 36H12z' fill='%23d7c38a'/%3E%3Cpath d='M24 40h16l-8-14-8 14z' fill='%23335c85'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://code.playcanvas.com/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <div class="hud">
+    <h1>Freeport Landing (Prototype)</h1>
+    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
+    <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+    <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
+    <div id="dialogue" class="dialogue hidden">
+      <div class="dialogue-name"></div>
+      <div class="dialogue-text"></div>
+    </div>
+  </div>
+  <div class="touch-ui">
+    <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <button id="interact-button" class="interact-button" aria-label="Interact">Interact</button>
+  </div>
+  <canvas id="application-canvas"></canvas>
+  <script src="scripts/main.js"></script>
+</body>
+</html>
+```
+
+---
+## styles.css
+```css
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #e7f0ff;
+  background: radial-gradient(circle at 25% 25%, #0f172a 0%, #0b1022 45%, #050814 100%);
+  overflow: hidden;
+}
+
+canvas {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  background: rgba(6, 12, 24, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 16px;
+  max-width: 420px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.hud h1 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+}
+
+.hud p {
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+  color: #c7d4eb;
+}
+
+.stats {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+}
+
+.interaction {
+  margin-top: 10px;
+  color: #f1e6c5;
+}
+
+.dialogue {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f4f5f7;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dialogue-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.dialogue-text {
+  line-height: 1.45;
+}
+
+.hidden {
+  display: none;
+}
+
+.touch-ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.joystick {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#move-joystick {
+  left: 20px;
+  bottom: 20px;
+}
+
+#look-joystick {
+  right: 20px;
+  bottom: 20px;
+}
+
+.joystick-handle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.interact-button {
+  position: absolute;
+  right: 22px;
+  bottom: 150px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.15);
+  color: #0c121c;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.interact-button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 600px) {
+  .hud {
+    max-width: calc(100vw - 32px);
+  }
+}
+```
+
+---
+## scripts/main.js
+```javascript
 if (typeof window.pc === 'undefined') {
   throw new Error('PlayCanvas engine failed to load. Please verify the CDN URL.');
 }
@@ -63,57 +254,9 @@ const palette = {
   sailor: new pc.Color(0.24, 0.46, 0.74),
 };
 
-const eqClasses = {
-  Warrior: {
-    stats: { STR: 90, STA: 85, AGI: 80, DEX: 75, INT: 55, WIS: 60, CHA: 65 },
-    baseHP: 150,
-    baseMana: 40,
-  },
-  Cleric: {
-    stats: { STR: 65, STA: 75, AGI: 65, DEX: 60, INT: 70, WIS: 95, CHA: 75 },
-    baseHP: 110,
-    baseMana: 180,
-  },
-  Ranger: {
-    stats: { STR: 75, STA: 75, AGI: 85, DEX: 85, INT: 60, WIS: 70, CHA: 70 },
-    baseHP: 125,
-    baseMana: 120,
-  },
-};
-
-const playerProfile = {
-  name: 'Adventurer',
-  classKey: 'Ranger',
-  level: 8,
-};
-
-function buildPlayerStats() {
-  const cls = eqClasses[playerProfile.classKey];
-  const hp = cls.baseHP + playerProfile.level * 12;
-  const mana = cls.baseMana + playerProfile.level * 8;
-  return {
-    ...cls.stats,
-    HP: hp,
-    Mana: mana,
-    AC: 120 + Math.floor(playerProfile.level * 2.5),
-  };
-}
-
 // Helpers for spawning primitives
 const colliders = [];
 const npcs = [];
-const actors = [];
-const questCrates = [];
-
-const supplyQuest = {
-  id: 'dock-supply-run',
-  name: 'Dock Supply Run',
-  description: 'Gather three marked supply crates for Quartermaster Ryn.',
-  required: 3,
-  progress: 0,
-  state: 'available', // available | active | ready
-  reward: '2s + harbor favor',
-};
 
 function registerBoxCollider(position, size, padding = 0.6) {
   colliders.push({
@@ -121,10 +264,6 @@ function registerBoxCollider(position, size, padding = 0.6) {
     halfExtents: new pc.Vec3(size.x * 0.5, size.y * 0.5, size.z * 0.5),
     padding,
   });
-}
-
-function registerActor(actor) {
-  actors.push(actor);
 }
 
 function addBox(name, size, position, material, withCollider = false) {
@@ -161,81 +300,16 @@ function addPlane(name, size, position, material, withCollider = false) {
   return entity;
 }
 
-function buildHumanoid(name, position, colors) {
-  const root = new pc.Entity(name);
-  root.setLocalPosition(position.x, position.y, position.z);
-
-  const torso = new pc.Entity(`${name}-torso`);
-  torso.addComponent('render', { type: 'box' });
-  torso.setLocalScale(1.1, 1.6, 0.8);
-  torso.setLocalPosition(0, 1.4, 0);
-  torso.render.material = makeMaterial(colors.torso, 0, 0.55);
-  torso.castShadows = true;
-
-  const head = new pc.Entity(`${name}-head`);
-  head.addComponent('render', { type: 'sphere' });
-  head.setLocalScale(0.6, 0.6, 0.6);
-  head.setLocalPosition(0, 2.3, 0);
-  head.render.material = makeMaterial(colors.skin, 0, 0.5);
-  head.castShadows = true;
-
-  const legs = new pc.Entity(`${name}-legs`);
-  legs.addComponent('render', { type: 'cylinder' });
-  legs.setLocalScale(0.7, 1.4, 0.7);
-  legs.setLocalPosition(0, 0.6, 0);
-  legs.render.material = makeMaterial(colors.legs, 0, 0.6);
-  legs.castShadows = true;
-
-  const arms = new pc.Entity(`${name}-arms`);
-  arms.addComponent('render', { type: 'cylinder' });
-  arms.setLocalScale(1.4, 0.35, 0.35);
-  arms.setLocalEulerAngles(0, 0, 90);
-  arms.setLocalPosition(0, 1.6, 0);
-  arms.render.material = makeMaterial(colors.torso, 0, 0.55);
-  arms.castShadows = true;
-
-  root.addChild(torso);
-  root.addChild(head);
-  root.addChild(legs);
-  root.addChild(arms);
-  app.root.addChild(root);
-
-  registerBoxCollider(position.clone().add(new pc.Vec3(0, 1.1, 0)), new pc.Vec3(1.4, 2.6, 1.4), 0.25);
-
-  return { root, head };
-}
-
-function addNPC(name, position, colors, dialogLines, options = {}) {
-  const humanoid = buildHumanoid(name, position, colors);
-  npcs.push({
-    entity: humanoid.root,
-    name,
-    dialogLines,
-    lineIndex: 0,
-    ...options,
-  });
-
-  registerActor({
-    type: 'npc',
-    name,
-    entity: humanoid.root,
-    head: humanoid.head,
-    health: options.health || 140,
-    maxHealth: options.health || 140,
-  });
-}
-
-function addQuestCrate(label, position) {
-  const crate = new pc.Entity(label);
-  crate.addComponent('render', { type: 'box' });
-  crate.setLocalScale(2.2, 2.2, 2.2);
-  crate.setLocalPosition(position.x, position.y + 1.1, position.z);
-  crate.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6);
-  crate.castShadows = true;
-  app.root.addChild(crate);
-
-  questCrates.push({ entity: crate, collected: false });
-  registerBoxCollider(position.clone().add(new pc.Vec3(0, 1.1, 0)), new pc.Vec3(2.2, 2.2, 2.2), 0.3);
+function addNPC(name, position, bodyColor, dialogLines) {
+  const npc = new pc.Entity(name);
+  npc.addComponent('render', { type: 'capsule' });
+  npc.setLocalScale(1.1, 2.2, 1.1);
+  npc.setLocalPosition(position);
+  npc.render.material = makeMaterial(bodyColor, 0, 0.55);
+  npc.castShadows = true;
+  app.root.addChild(npc);
+  npcs.push({ entity: npc, name, dialogLines, lineIndex: 0 });
+  registerBoxCollider(position, new pc.Vec3(1.4, 2.2, 1.4), 0.3);
 }
 
 // Build the Freeport-inspired zone
@@ -296,44 +370,19 @@ function buildFreeportLanding() {
   addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
   addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
 
-  // NPCs and interactables
-  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), { torso: palette.sailor, legs: palette.stone, skin: new pc.Color(0.93, 0.83, 0.7) }, [
+  // NPCs
+  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), palette.sailor, [
     'Busy day at the docks. Ships from Qeynos arrived at dawn.',
     'If you head inland, watch for the market patrols—they keep things tidy.',
   ]);
-  addNPC(
-    'Quartermaster Ryn',
-    new pc.Vec3(40, 0, -14),
-    { torso: palette.cloth, legs: palette.stone, skin: new pc.Color(0.86, 0.76, 0.64) },
-    [
-      'Supplies are thin, but the Freeport guard always gets first pick.',
-      'Need armor? The smithy by the north wall can size you up.',
-    ],
-    { questGiver: true }
-  );
-  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), { torso: palette.noble, legs: palette.roof, skin: new pc.Color(0.9, 0.8, 0.72) }, [
+  addNPC('Quartermaster Ryn', new pc.Vec3(40, 0, -14), palette.cloth, [
+    'Supplies are thin, but the Freeport guard always gets first pick.',
+    'Need armor? The smithy by the north wall can size you up.',
+  ]);
+  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), palette.noble, [
     'The sea breeze carries whispers of distant isles.',
     'When the bells toll at dusk, the harbor gates close—plan your return.',
   ]);
-
-  addNPC('Guard Veylan', new pc.Vec3(-12, 0, 6), { torso: palette.stone, legs: palette.roof, skin: new pc.Color(0.72, 0.63, 0.55) }, [
-    'Stay clear of troublemaker alleys—my patrol covers the plaza.',
-    'If you spot loose crates, report back to Quartermaster Ryn.',
-  ], { health: 180 });
-
-  addQuestCrate('Supply Crate A', new pc.Vec3(70, 0, -6));
-  addQuestCrate('Supply Crate B', new pc.Vec3(94, 0, 34));
-  addQuestCrate('Supply Crate C', new pc.Vec3(54, 0, 46));
-
-  const dummy = addCylinder('Training Dummy', 3, 8, new pc.Vec3(-28, 4, 12), makeMaterial(new pc.Color(0.45, 0.32, 0.2), 0.05, 0.6), true);
-  registerActor({
-    type: 'enemy',
-    name: 'Training Dummy',
-    entity: dummy,
-    head: dummy, // top of cylinder works for nameplate
-    health: 80,
-    maxHealth: 80,
-  });
 }
 
 buildFreeportLanding();
@@ -343,7 +392,7 @@ const moveSpeed = 10;
 const sprintMultiplier = 1.8;
 const rotSpeed = 0.0022;
 const gamepadLookSpeed = 2.4;
-const touchLookSpeed = 0.075; // slower mobile look to reduce sensitivity
+const touchLookSpeed = 0.75; // slower mobile look to reduce sensitivity
 let yaw = Math.PI / 2; // face toward the city from the west gate
 let pitch = -0.1;
 const velocity = new pc.Vec3();
@@ -351,25 +400,9 @@ const direction = new pc.Vec3();
 const radToDeg = (radians) => (radians * 180) / Math.PI;
 const interactRadius = 5.5;
 let interactionQueued = false;
-let selectedTarget = null;
-let menuOpen = false;
-const screenPos = new pc.Vec3();
-const playerStats = buildPlayerStats();
-const playerActor = {
-  type: 'player',
-  name: `${playerProfile.name} (You)`,
-  entity: camera,
-  head: null,
-  health: playerStats.HP,
-  maxHealth: playerStats.HP,
-};
-registerActor(playerActor);
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'm') {
-    toggleMenu();
-  }
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
   if (e.key.toLowerCase() === 'e') interactionQueued = true;
@@ -386,10 +419,8 @@ function readGamepad() {
 }
 
 let previousGamepadSouth = false;
-let previousGamepadY = false;
 
 function applyGamepadLook(dt) {
-  if (menuOpen) return;
   const pad = readGamepad();
   if (!pad) return;
   const lx = pad.axes[2] || 0;
@@ -410,17 +441,6 @@ function pollGamepadInteract() {
   const south = !!(pad.buttons[0] && pad.buttons[0].pressed);
   if (south && !previousGamepadSouth) interactionQueued = true;
   previousGamepadSouth = south;
-}
-
-function pollGamepadMenuToggle() {
-  const pad = readGamepad();
-  if (!pad || !pad.buttons || !pad.buttons.length) {
-    previousGamepadY = false;
-    return;
-  }
-  const yPressed = !!(pad.buttons[3] && pad.buttons[3].pressed);
-  if (yPressed && !previousGamepadY) toggleMenu();
-  previousGamepadY = yPressed;
 }
 
 function readGamepadMove() {
@@ -509,11 +529,15 @@ function handleTouchEnd(e) {
 }
 
 ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((evt) => {
-  document.addEventListener(evt, (e) => {
-    if (evt === 'touchstart') handleTouchStart(e);
-    else if (evt === 'touchmove') handleTouchMove(e);
-    else handleTouchEnd(e);
-  }, { passive: false });
+  document.addEventListener(
+    evt,
+    (e) => {
+      if (evt === 'touchstart') handleTouchStart(e);
+      else if (evt === 'touchmove') handleTouchMove(e);
+      else handleTouchEnd(e);
+    },
+    { passive: false },
+  );
 });
 
 function getTouchMoveVector() {
@@ -525,7 +549,6 @@ function getTouchMoveVector() {
 }
 
 function applyTouchLook(dt) {
-  if (menuOpen) return;
   const { delta } = touchState.look;
   if (!delta.x && !delta.y) return;
   yaw -= (delta.x / joystickRadius) * touchLookSpeed * dt * 60;
@@ -536,21 +559,6 @@ function applyTouchLook(dt) {
 canvas.addEventListener('click', () => {
   if (!document.pointerLockElement) {
     canvas.requestPointerLock();
-  }
-});
-
-canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return;
-  if (!document.pointerLockElement) {
-    handlePointerSelect(e.clientX, e.clientY);
-  } else {
-    handlePointerSelect(window.innerWidth / 2, window.innerHeight / 2);
-  }
-});
-
-canvas.addEventListener('touchend', (e) => {
-  for (const touch of e.changedTouches) {
-    handlePointerSelect(touch.clientX, touch.clientY);
   }
 });
 
@@ -576,243 +584,38 @@ const dialogueEl = document.getElementById('dialogue');
 const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
 const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
 const interactButton = document.getElementById('interact-button');
-const classPanelEl = document.getElementById('classPanel');
-const questStatusEl = document.getElementById('questStatus');
-const helpContentEl = document.getElementById('helpContent');
-const inventoryContentEl = document.getElementById('inventoryContent');
-const nameplateEl = document.getElementById('nameplate');
-const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
-const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
-const menuOverlay = document.getElementById('gameMenu');
-const menuToggleBtn = document.getElementById('menuToggle');
-const menuCloseBtn = document.getElementById('menuClose');
-const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
-const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 
 interactButton.addEventListener('click', () => {
   interactionQueued = true;
 });
 
-menuToggleBtn.addEventListener('click', () => toggleMenu());
-menuCloseBtn.addEventListener('click', () => closeMenu());
-
-tabButtons.forEach((btn) => {
-  btn.addEventListener('click', () => setTab(btn.dataset.tab));
-});
-
-function setTab(tab) {
-  tabButtons.forEach((btn) => {
-    const active = btn.dataset.tab === tab;
-    btn.classList.toggle('active', active);
-    btn.setAttribute('aria-selected', active);
-  });
-  tabPanels.forEach((panel) => {
-    panel.classList.toggle('active', panel.id === `tab-${tab}`);
-  });
-}
-
-function openMenu() {
-  if (menuOpen) return;
-  menuOpen = true;
-  menuOverlay.classList.remove('hidden');
-  menuToggleBtn.classList.add('hidden');
-  interactionHint.classList.add('hidden');
-  if (document.pointerLockElement === canvas) {
-    document.exitPointerLock();
-  }
-}
-
-function closeMenu() {
-  if (!menuOpen) return;
-  menuOpen = false;
-  menuOverlay.classList.add('hidden');
-  menuToggleBtn.classList.remove('hidden');
-}
-
-function toggleMenu() {
-  if (menuOpen) closeMenu();
-  else openMenu();
-}
-
-function renderHelpPanel() {
-  helpContentEl.innerHTML = `
-    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, M to open menu.</div>
-    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, Y to open menu.</div>
-    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, Interact button for talking/picking up, top menu button for panels.</div>
-  `;
-}
-
-function updateInventoryPanel() {
-  if (supplyQuest.state === 'active' || supplyQuest.state === 'ready') {
-    inventoryContentEl.textContent = `Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}`;
-  } else {
-    inventoryContentEl.textContent = 'Your satchel is light. Pick up supply crates to see loot tracked here.';
-  }
-}
-
 function updateHud() {
   const p = camera.getPosition();
-  posLabel.textContent = `Freeport · ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
+  posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
 
-function renderClassPanel() {
-  const stats = buildPlayerStats();
-  const lines = [
-    `<strong>${playerProfile.name}</strong> — Level ${playerProfile.level} ${playerProfile.classKey}`,
-    `HP ${stats.HP} · Mana ${stats.Mana} · AC ${stats.AC}`,
-    `STR ${stats.STR} · STA ${stats.STA} · AGI ${stats.AGI} · DEX ${stats.DEX}`,
-    `INT ${stats.INT} · WIS ${stats.WIS} · CHA ${stats.CHA}`,
-  ];
-  classPanelEl.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
-}
-
-function updateQuestStatus() {
-  if (supplyQuest.state === 'available') {
-    questStatusEl.textContent = `${supplyQuest.name}: ${supplyQuest.description}`;
-  } else if (supplyQuest.state === 'active') {
-    questStatusEl.textContent = `${supplyQuest.name}: ${supplyQuest.progress}/${supplyQuest.required} crates gathered.`;
-  } else if (supplyQuest.state === 'ready') {
-    questStatusEl.textContent = `${supplyQuest.name}: Return to Quartermaster Ryn for your reward.`;
-  }
-  updateInventoryPanel();
-}
-
-function getHeadPosition(actor) {
-  if (actor.type === 'player') {
-    return camera.getPosition().clone().add(new pc.Vec3(0, 1.8, 0));
-  }
-  if (actor.head) return actor.head.getWorldPosition();
-  return actor.entity.getPosition();
-}
-
-function updateNameplatePosition() {
-  if (!selectedTarget) {
-    nameplateEl.classList.add('hidden');
-    return;
-  }
-  const worldPos = getHeadPosition(selectedTarget);
-  camera.camera.worldToScreen(worldPos, screenPos);
-  if (screenPos.z < 0) {
-    nameplateEl.classList.add('hidden');
-    return;
-  }
-  nameplateEl.style.left = `${screenPos.x}px`;
-  nameplateEl.style.top = `${screenPos.y - 28}px`;
-  nameplateNameEl.textContent = `${selectedTarget.name}`;
-  const ratio = selectedTarget.health / selectedTarget.maxHealth;
-  nameplateHealthBar.style.width = `${Math.max(5, ratio * 100)}%`;
-  nameplateEl.classList.remove('hidden');
-}
-
-function selectActor(actor) {
-  selectedTarget = actor;
-  updateNameplatePosition();
-}
-
-function handlePointerSelect(clientX, clientY) {
-  let closest = null;
-  let closestDist = 90;
-  actors.forEach((actor) => {
-    const worldPos = getHeadPosition(actor);
-    camera.camera.worldToScreen(worldPos, screenPos);
-    if (screenPos.z < 0) return;
-    const dx = screenPos.x - clientX;
-    const dy = screenPos.y - clientY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < closestDist) {
-      closest = actor;
-      closestDist = dist;
-    }
-  });
-  if (closest) selectActor(closest);
-}
-
-function actorForEntity(entity) {
-  return actors.find((a) => a.entity === entity) || null;
-}
-
-function interactWithCrate(crate) {
-  if (crate.collected || supplyQuest.state !== 'active') return;
-  crate.collected = true;
-  crate.entity.render.material = makeMaterial(new pc.Color(0.32, 0.24, 0.2), 0, 0.8);
-  supplyQuest.progress = Math.min(supplyQuest.required, supplyQuest.progress + 1);
-  showDialogue('Supply Crate', `You secure a crate. ${supplyQuest.progress}/${supplyQuest.required} gathered.`);
-  if (supplyQuest.progress >= supplyQuest.required) {
-    supplyQuest.state = 'ready';
-  }
-  updateQuestStatus();
-}
-
-function questDialogueForRyn() {
-  if (supplyQuest.state === 'available') {
-    return `${supplyQuest.name}: ${supplyQuest.description} Reward: ${supplyQuest.reward}.`;
-  }
-  if (supplyQuest.state === 'active') {
-    return `${supplyQuest.progress}/${supplyQuest.required} crates gathered. Keep looking around the docks.`;
-  }
-  if (supplyQuest.state === 'ready') {
-    return `Well done. Here's your pay. Crates will keep arriving—check again soon.`;
-  }
-  return '';
-}
-
-function interactWithNPC(npc) {
-  const actor = actorForEntity(npc.entity);
-  if (actor) selectActor(actor);
-
-  if (npc.questGiver) {
-    if (supplyQuest.state === 'available') {
-      supplyQuest.state = 'active';
-      supplyQuest.progress = 0;
-      questCrates.forEach((c) => (c.collected = false));
-      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
-    } else if (supplyQuest.state === 'ready') {
-      supplyQuest.state = 'available';
-      supplyQuest.progress = 0;
-      questCrates.forEach((c) => (c.collected = false));
-      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
-    }
-    updateQuestStatus();
-    showDialogue(npc.name, questDialogueForRyn());
-    return;
-  }
-
-  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
-  npc.lineIndex += 1;
-  showDialogue(npc.name, line);
-}
-
-function findNearestInteractable() {
+function findNearestNPC() {
   const playerPos = camera.getPosition();
   let nearest = null;
   let nearestDist = interactRadius;
-
   for (const npc of npcs) {
     const dist = npc.entity.getPosition().distance(playerPos);
     if (dist <= nearestDist) {
-      nearest = { type: 'npc', ref: npc };
+      nearest = npc;
       nearestDist = dist;
     }
   }
-
-  questCrates.forEach((crate) => {
-    if (crate.collected || supplyQuest.state !== 'active') return;
-    const dist = crate.entity.getPosition().distance(playerPos);
-    if (dist <= nearestDist) {
-      nearest = { type: 'crate', ref: crate };
-      nearestDist = dist;
-    }
-  });
-
   return nearest;
 }
 
-function showDialogue(name, line) {
-  if (!name || !line) {
+function showDialogue(npc) {
+  if (!npc) {
     dialogueEl.classList.add('hidden');
     return;
   }
-  dialogueNameEl.textContent = name;
+  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
+  npc.lineIndex += 1;
+  dialogueNameEl.textContent = npc.name;
   dialogueTextEl.textContent = line;
   dialogueEl.classList.remove('hidden');
 }
@@ -829,12 +632,6 @@ function collides(position) {
 }
 
 app.on('update', (dt) => {
-  pollGamepadMenuToggle();
-  if (menuOpen) {
-    updateNameplatePosition();
-    return;
-  }
-
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
@@ -890,28 +687,81 @@ app.on('update', (dt) => {
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
-  const nearest = findNearestInteractable();
-  if (nearest?.type === 'npc') {
-    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.ref.name}.`;
-    interactionHint.classList.remove('hidden');
+  const nearest = findNearestNPC();
+  if (nearest) {
+    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.name}.`;
     if (interactionQueued) {
-      interactWithNPC(nearest.ref);
+      showDialogue(nearest);
     }
-  } else if (nearest?.type === 'crate') {
-    interactionHint.innerHTML = 'Press <strong>E</strong> / south face / tap Interact to secure this supply crate.';
-    interactionHint.classList.remove('hidden');
-    if (interactionQueued) interactWithCrate(nearest.ref);
   } else {
-    interactionHint.classList.add('hidden');
+    interactionHint.innerHTML = 'Walk up to someone and press <strong>E</strong> / south face / tap Interact.';
   }
   interactionQueued = false;
   updateHud();
-  updateNameplatePosition();
 });
 
-renderClassPanel();
-renderHelpPanel();
-updateQuestStatus();
-setTab('stats');
 updateHud();
 app.start();
+```
+
+---
+## README.md
+```markdown
+# Freeport Landing (PlayCanvas)
+A single-zone prototype inspired by EverQuest's Freeport harbor. Walk the docks, city walls, and plaza to test controls and scale.
+Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers.
+
+## Files you need
+- `index.html`: Loads the PlayCanvas engine from the CDN, wires up the HUD, and mounts the canvas.
+- `scripts/main.js`: Builds the Freeport scene, prevents walking through walls, adds a few interactive NPCs, and sets up camera controls (keyboard, gamepad, and touch).
+- `styles.css`: Full-viewport canvas styling and HUD appearance.
+- `README.md`: This guide.
+- `FULL_SOURCE.md`: A copy-paste-ready listing of every source file in this prototype.
+
+## Running locally
+Open `index.html` in a modern browser (or serve the folder with any static server) to try the prototype.
+
+### Talking to NPCs
+- Walk within a few meters of an NPC to see their name in the HUD.
+- Press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
+
+## Git remote
+This workspace is configured with the GitHub remote:
+
+- `origin`: https://github.com/ian-dungan/mymmo.git
+
+If you need to re-create it, run:
+
+```bash
+git remote add origin https://github.com/ian-dungan/mymmo.git
+```
+
+## Pushing your changes
+When you are ready to publish your work, push the current branch to GitHub:
+
+```bash
+git push origin work
+```
+
+If you want the branch to become the default line of development, open a pull request on GitHub and merge it into `main`.
+
+## Committing and pushing in one go
+If you've made local edits and want to save them to the repo, run the full flow:
+
+```bash
+git status          # review what's changed
+git add <files>     # or `git add .` for everything
+git commit -m "describe your change"
+git push origin work
+```
+
+After pushing, create or update a pull request on GitHub to merge the `work` branch into `main` when you're satisfied.
+
+## Resolving merge conflicts on GitHub
+When GitHub shows conflict markers, the options in the UI map to the versions of the file like this:
+- **Current change**: your branch's version of the code.
+- **Incoming change**: the version from the branch you are merging into yours (often `main` or a PR source).
+- **Accept both**: keeps both blocks so you can manually edit them into a single clean result afterward.
+
+Choose the block that has the correct logic or content. After accepting, edit the merged text to remove duplicates or leftover markers, then save and commit the resolution.
+```
