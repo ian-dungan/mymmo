@@ -87,6 +87,39 @@ const playerProfile = {
   level: 8,
 };
 
+const abilityBook = {
+  slash: {
+    id: 'slash',
+    name: 'Skirmish Slash',
+    type: 'melee',
+    range: 4,
+    cooldown: 1.6,
+    staminaCost: 0,
+    manaCost: 0,
+    minDamage: 7,
+    maxDamage: 12,
+  },
+  emberBolt: {
+    id: 'emberBolt',
+    name: 'Ember Bolt',
+    type: 'magic',
+    range: 16,
+    cooldown: 3.5,
+    manaCost: 15,
+    minDamage: 11,
+    maxDamage: 16,
+  },
+  enemyBite: {
+    id: 'enemyBite',
+    name: 'Rake',
+    type: 'melee',
+    range: 3.5,
+    cooldown: 2.2,
+    minDamage: 5,
+    maxDamage: 9,
+  },
+};
+
 function buildPlayerStats() {
   const cls = eqClasses[playerProfile.classKey];
   const hp = cls.baseHP + playerProfile.level * 12;
@@ -106,6 +139,9 @@ const actors = [];
 const actorRegistry = new Map();
 let actorIdCounter = 0;
 const questCrates = [];
+const combatState = {
+  abilityCooldowns: new Map(),
+};
 
 const supplyQuest = {
   id: 'dock-supply-run',
@@ -140,6 +176,13 @@ function createActor(config) {
     tags: config.tags || [],
     maxHealth,
     health: config.health ?? maxHealth,
+    maxMana: config.maxMana ?? 0,
+    mana: config.mana ?? 0,
+    abilities: config.abilities || [],
+    respawn: config.respawn || null,
+    aggro: config.aggro || { passive: true },
+    target: null,
+    dead: false,
   };
   actors.push(actor);
   actorRegistry.set(id, actor);
@@ -247,6 +290,53 @@ function addNPC(name, position, colors, dialogLines, options = {}) {
     actorId: actor.id,
     ...options,
   });
+}
+
+function addBat(name, position) {
+  const root = new pc.Entity(name);
+  root.setLocalPosition(position.x, position.y, position.z);
+
+  const body = new pc.Entity(`${name}-body`);
+  body.addComponent('render', { type: 'sphere' });
+  body.setLocalScale(1.6, 1, 1.6);
+  body.render.material = makeMaterial(new pc.Color(0.2, 0.2, 0.24), 0.05, 0.45);
+
+  const wingL = new pc.Entity(`${name}-wingL`);
+  wingL.addComponent('render', { type: 'box' });
+  wingL.setLocalScale(2.6, 0.2, 0.8);
+  wingL.setLocalPosition(-1.8, 0.2, 0);
+  wingL.render.material = makeMaterial(new pc.Color(0.16, 0.16, 0.18), 0.05, 0.5);
+
+  const wingR = new pc.Entity(`${name}-wingR`);
+  wingR.addComponent('render', { type: 'box' });
+  wingR.setLocalScale(2.6, 0.2, 0.8);
+  wingR.setLocalPosition(1.8, 0.2, 0);
+  wingR.render.material = makeMaterial(new pc.Color(0.16, 0.16, 0.18), 0.05, 0.5);
+
+  root.addChild(body);
+  root.addChild(wingL);
+  root.addChild(wingR);
+  app.root.addChild(root);
+
+  registerBoxCollider(position.clone().add(new pc.Vec3(0, 0.5, 0)), new pc.Vec3(3, 1.2, 3), 0.6);
+
+  const actor = createActor({
+    type: 'enemy',
+    name,
+    entity: root,
+    head: body,
+    health: 20,
+    maxHealth: 20,
+    level: 2,
+    role: 'wildlife',
+    faction: 'Freeport Wildlife',
+    tags: ['enemy', 'bat'],
+    abilities: [abilityBook.enemyBite],
+    aggro: { passive: true, assistsOnHit: true },
+    respawn: { delay: 30, spawnPoint: position.clone() },
+  });
+
+  return actor;
 }
 
 function addQuestCrate(label, position) {
@@ -362,6 +452,8 @@ function buildFreeportLanding() {
     faction: 'neutral',
     tags: ['enemy'],
   });
+
+  addBat('Dockside Bat', new pc.Vec3(108, 1.2, 64));
 }
 
 buildFreeportLanding();
@@ -379,20 +471,30 @@ const direction = new pc.Vec3();
 const radToDeg = (radians) => (radians * 180) / Math.PI;
 const interactRadius = 5.5;
 let interactionQueued = false;
+let queuedAbility = null;
 let selectedTarget = null;
 let menuOpen = false;
 const screenPos = new pc.Vec3();
 const playerStats = buildPlayerStats();
+const playerState = {
+  health: playerStats.HP,
+  mana: playerStats.Mana,
+  maxHealth: playerStats.HP,
+  maxMana: playerStats.Mana,
+};
 const playerActor = createActor({
   type: 'player',
   name: `${playerProfile.name} (You)`,
   entity: camera,
   head: null,
-  health: playerStats.HP,
-  maxHealth: playerStats.HP,
+  health: playerState.health,
+  maxHealth: playerState.maxHealth,
+  mana: playerState.mana,
+  maxMana: playerState.maxMana,
   level: playerProfile.level,
   role: playerProfile.classKey,
   tags: ['player'],
+  abilities: [abilityBook.slash, abilityBook.emberBolt],
 });
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
@@ -403,6 +505,8 @@ window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
   if (e.key.toLowerCase() === 'e') interactionQueued = true;
+  if (e.key === '1') queuePrimaryAttack();
+  if (e.key === '2') queueSecondaryAttack();
 });
 window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
@@ -417,6 +521,7 @@ function readGamepad() {
 
 let previousGamepadSouth = false;
 let previousGamepadY = false;
+let previousGamepadEast = false;
 
 function applyGamepadLook(dt) {
   if (menuOpen) return;
@@ -451,6 +556,17 @@ function pollGamepadMenuToggle() {
   const yPressed = !!(pad.buttons[3] && pad.buttons[3].pressed);
   if (yPressed && !previousGamepadY) toggleMenu();
   previousGamepadY = yPressed;
+}
+
+function pollGamepadAttack() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadEast = false;
+    return;
+  }
+  const east = !!(pad.buttons[2] && pad.buttons[2].pressed);
+  if (east && !previousGamepadEast) queuePrimaryAttack();
+  previousGamepadEast = east;
 }
 
 function readGamepadMove() {
@@ -619,6 +735,7 @@ const interactionHint = document.getElementById('interactionHint');
 const dialogueEl = document.getElementById('dialogue');
 const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
 const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
+const attackButton = document.getElementById('attack-button');
 const interactButton = document.getElementById('interact-button');
 const classPanelEl = document.getElementById('classPanel');
 const questStatusEl = document.getElementById('questStatus');
@@ -636,6 +753,10 @@ const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 
 interactButton.addEventListener('click', () => {
   interactionQueued = true;
+});
+
+attackButton.addEventListener('click', () => {
+  queuePrimaryAttack();
 });
 
 menuToggleBtn.addEventListener('click', () => toggleMenu());
@@ -689,9 +810,9 @@ function toggleMenu() {
 
 function renderHelpPanel() {
   helpContentEl.innerHTML = `
-    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, M to open menu.</div>
-    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, Y to open menu.</div>
-    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, Interact button for talking/picking up, top menu button for panels.</div>
+    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu.</div>
+    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, East face to attack, Y to open menu.</div>
+    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, Interact for talking/looting, <strong>Attack</strong> for combat, top menu button for panels.</div>
   `;
 }
 
@@ -712,7 +833,7 @@ function renderClassPanel() {
   const stats = buildPlayerStats();
   const lines = [
     `<strong>${playerProfile.name}</strong> — Level ${playerProfile.level} ${playerProfile.classKey}`,
-    `HP ${stats.HP} · Mana ${stats.Mana} · AC ${stats.AC}`,
+    `HP ${Math.round(playerState.health)}/${stats.HP} · Mana ${Math.round(playerState.mana)}/${stats.Mana} · AC ${stats.AC}`,
     `STR ${stats.STR} · STA ${stats.STA} · AGI ${stats.AGI} · DEX ${stats.DEX}`,
     `INT ${stats.INT} · WIS ${stats.WIS} · CHA ${stats.CHA}`,
   ];
@@ -823,6 +944,128 @@ function npcForActor(actor) {
   return npcs.find((n) => n.actorId === actor.id) || null;
 }
 
+function abilityKey(actor, ability) {
+  return `${actor.id}:${ability.id}`;
+}
+
+function abilityReady(actor, ability) {
+  const key = abilityKey(actor, ability);
+  const last = combatState.abilityCooldowns.get(key) || 0;
+  return performance.now() - last >= ability.cooldown * 1000;
+}
+
+function markAbilityUsed(actor, ability) {
+  combatState.abilityCooldowns.set(abilityKey(actor, ability), performance.now());
+}
+
+function randomDamage(ability) {
+  return ability.minDamage + Math.random() * (ability.maxDamage - ability.minDamage);
+}
+
+function actorPosition(actor) {
+  return actor.entity.getPosition();
+}
+
+function distanceBetweenActors(a, b) {
+  return actorPosition(a).distance(actorPosition(b));
+}
+
+function applyDamage(attacker, target, amount) {
+  if (!target || target.health <= 0) return;
+  const newHp = Math.max(0, target.health - amount);
+  target.health = newHp;
+  if (target.type === 'player') {
+    playerState.health = newHp;
+    if (playerState.health <= 0) {
+      playerState.health = playerState.maxHealth;
+      target.health = playerState.maxHealth;
+      playerState.mana = playerState.maxMana;
+      target.mana = playerState.maxMana;
+      camera.setLocalPosition(10, 5.5, 0);
+      showDialogue('You come to.', 'You awaken at the plaza after collapsing.');
+    }
+  }
+
+  if (target.health <= 0) {
+    handleDeath(target);
+  }
+  updateNameplatePosition();
+  renderClassPanel();
+}
+
+function respawnActor(actor) {
+  if (!actor.respawn) return;
+  actor.health = actor.maxHealth;
+  actor.mana = actor.maxMana || 0;
+  actor.dead = false;
+  actor.target = null;
+  actor.entity.enabled = true;
+  if (actor.respawn.spawnPoint) {
+    actor.entity.setLocalPosition(actor.respawn.spawnPoint);
+  }
+}
+
+function handleDeath(actor) {
+  actor.dead = true;
+  actor.target = null;
+  if (selectedTarget === actor) {
+    updateNameplatePosition();
+  }
+  if (actor.type === 'enemy') {
+    actor.entity.enabled = false;
+    if (actor.respawn) {
+      setTimeout(() => respawnActor(actor), actor.respawn.delay * 1000);
+    }
+  }
+}
+
+function ensureAggroOnHit(defender, attacker) {
+  if (defender.type !== 'enemy') return;
+  defender.target = attacker;
+}
+
+function useAbility(actor, ability, target) {
+  if (!ability || !actor || !target) return false;
+  if (target.health <= 0 || actor.health <= 0) return false;
+  if (!abilityReady(actor, ability)) return false;
+
+  const dist = distanceBetweenActors(actor, target);
+  if (dist > ability.range) {
+    showDialogue('Out of range', `${ability.name} needs to be closer.`);
+    return false;
+  }
+
+  if (ability.manaCost && actor.mana !== undefined) {
+    if (actor.mana < ability.manaCost) {
+      showDialogue('Not enough mana', `${ability.name} requires ${ability.manaCost} mana.`);
+      return false;
+    }
+    actor.mana -= ability.manaCost;
+    if (actor === playerActor) {
+      playerState.mana = actor.mana;
+      renderClassPanel();
+    }
+  }
+
+  const dmg = randomDamage(ability);
+  applyDamage(actor, target, dmg);
+  markAbilityUsed(actor, ability);
+
+  if (target.type === 'enemy') {
+    ensureAggroOnHit(target, actor);
+  }
+
+  return true;
+}
+
+function queuePrimaryAttack() {
+  queuedAbility = 'slash';
+}
+
+function queueSecondaryAttack() {
+  queuedAbility = 'emberBolt';
+}
+
 function interactWithCrate(crate) {
   if (crate.collected || supplyQuest.state !== 'active') return;
   crate.collected = true;
@@ -899,6 +1142,51 @@ function findNearestInteractable() {
   return nearest;
 }
 
+function findCombatTarget() {
+  if (selectedTarget && selectedTarget.health > 0 && selectedTarget.type !== 'npc') return selectedTarget;
+  let fallback = null;
+  let nearestDist = 18;
+  actors.forEach((actor) => {
+    if (actor.type !== 'enemy' || actor.health <= 0 || actor.dead) return;
+    const d = actorPosition(actor).distance(camera.getPosition());
+    if (d < nearestDist) {
+      fallback = actor;
+      nearestDist = d;
+    }
+  });
+  return fallback;
+}
+
+function handleQueuedAbility() {
+  if (!queuedAbility) return;
+  const ability = abilityBook[queuedAbility];
+  const target = findCombatTarget();
+  if (!target) {
+    showDialogue('No target', 'Select or tap a foe to use abilities.');
+    queuedAbility = null;
+    return;
+  }
+  if (useAbility(playerActor, ability, target)) {
+    selectActor(target);
+  }
+  queuedAbility = null;
+}
+
+function updateEnemyAI() {
+  actors.forEach((actor) => {
+    if (actor.type !== 'enemy' || actor.health <= 0 || actor.dead) return;
+    if (!actor.target || actor.target.health <= 0) {
+      actor.target = null;
+      return;
+    }
+    const ability = actor.abilities[0] || abilityBook.enemyBite;
+    if (!abilityReady(actor, ability)) return;
+    if (distanceBetweenActors(actor, actor.target) <= ability.range + 0.5) {
+      useAbility(actor, ability, actor.target);
+    }
+  });
+}
+
 function showDialogue(name, line) {
   if (!name || !line) {
     dialogueEl.classList.add('hidden');
@@ -931,6 +1219,8 @@ app.on('update', (dt) => {
   applyGamepadLook(dt);
   applyTouchLook(dt);
   pollGamepadInteract();
+  pollGamepadAttack();
+  handleQueuedAbility();
 
   // build local basis
   const forward = camera.forward.clone();
@@ -978,6 +1268,18 @@ app.on('update', (dt) => {
   if (!collides(stepZ)) finalPos.z = next.z;
 
   camera.setLocalPosition(finalPos);
+
+  // Lightweight regen to keep testing flowing
+  if (playerState.health < playerState.maxHealth) {
+    playerState.health = Math.min(playerState.maxHealth, playerState.health + dt * 2.5);
+    playerActor.health = playerState.health;
+  }
+  if (playerState.mana < playerState.maxMana) {
+    playerState.mana = Math.min(playerState.maxMana, playerState.mana + dt * 3);
+    playerActor.mana = playerState.mana;
+  }
+
+  updateEnemyAI(dt);
 
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);

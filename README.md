@@ -11,10 +11,11 @@ Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold
 ## Running locally
 Open `index.html` in a modern browser (or serve the folder with any static server) to try the prototype.
 
-### Talking to NPCs and selecting targets
+### Talking to NPCs, selecting targets, and fighting
 - Walk within a few meters of an NPC to see their prompt, then press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
-- Left-click or tap characters (NPCs, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
+- Left-click or tap characters (NPCs, enemies, the training dummy, or your own player) to show their nameplate and health bar over their head, EverQuest style. Taps on mobile also select nearby NPCs or quest crates so you can interact without using the Interact button.
 - Quartermaster Ryn offers a repeatable **Dock Supply Run** quest. Accept it to gather the three marked crates around the docks, then return for your reward.
+- Combat uses EQ-inspired abilities: press **1** (keyboard), **East face** (gamepad), or tap **Attack** (mobile) for melee, and **2** for a ranged Ember Bolt. The training dummy and a dockside bat can be used to test combat; the bat starts passive, becomes hostile if attacked, and respawns 30 seconds after defeat with 20 HP.
 
 ### Classes, stats, and menu tabs
 - The sample character is a level 8 Ranger with classic EverQuest-style attributes (STR/STA/AGI/DEX/INT/WIS/CHA) plus HP, Mana, and AC.

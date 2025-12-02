@@ -226,6 +226,25 @@ canvas {
   pointer-events: auto;
 }
 
+.attack-button {
+  position: absolute;
+  right: 22px;
+  bottom: 90px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(220, 85, 85, 0.85), rgba(140, 40, 40, 0.9));
+  color: #fff2e6;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.attack-button:active {
+  transform: translateY(1px);
+}
+
 .interact-button:active {
   transform: translateY(1px);
 }
