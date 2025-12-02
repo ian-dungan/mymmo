@@ -459,6 +459,7 @@ function buildFreeportLanding() {
 buildFreeportLanding();
 
 // Player movement handling
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const moveSpeed = 10;
 const sprintMultiplier = 1.8;
 const rotSpeed = 0.0022;
@@ -657,7 +658,11 @@ function handleTouchEnd(e) {
     if (isLook) resetStick('look');
 
     const tapDistance = Math.hypot(delta.x, delta.y);
-    const tapped = tapDistance < 12 && !menuOpen && !touch.target.closest('.menu, .menu-toggle, #interact-button');
+    const tapThreshold = isTouchDevice ? 26 : 12;
+    const tapped =
+      tapDistance < tapThreshold &&
+      !menuOpen &&
+      !touch.target.closest('.menu, .menu-toggle, #interact-button, #attack-button');
     if (tapped) {
       handlePointerSelect(touch.clientX, touch.clientY);
     }
@@ -751,12 +756,22 @@ const menuCloseBtn = document.getElementById('menuClose');
 const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 
-interactButton.addEventListener('click', () => {
+const queueInteract = () => {
   interactionQueued = true;
-});
-
-attackButton.addEventListener('click', () => {
+};
+const triggerAttack = () => {
   queuePrimaryAttack();
+};
+
+['click', 'touchstart'].forEach((evt) => {
+  interactButton.addEventListener(evt, (e) => {
+    e.preventDefault();
+    queueInteract();
+  });
+  attackButton.addEventListener(evt, (e) => {
+    e.preventDefault();
+    triggerAttack();
+  });
 });
 
 menuToggleBtn.addEventListener('click', () => toggleMenu());
@@ -886,7 +901,8 @@ function selectActor(actor) {
 
 function pickTargetAtScreen(clientX, clientY) {
   let closest = null;
-  let closestDist = 110;
+  const selectionRadius = isTouchDevice ? 220 : 110;
+  let closestDist = selectionRadius;
 
   actors.forEach((actor) => {
     const worldPos = getHeadPosition(actor);
