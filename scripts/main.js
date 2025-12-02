@@ -113,12 +113,12 @@ function addNPC(name, position, bodyColor, dialogLines) {
   const npc = new pc.Entity(name);
   npc.addComponent('render', { type: 'capsule' });
   npc.setLocalScale(1.1, 2.2, 1.1);
-  npc.setLocalPosition(position);
+  npc.setLocalPosition(position.x, position.y + 1.1, position.z);
   npc.render.material = makeMaterial(bodyColor, 0, 0.55);
   npc.castShadows = true;
   app.root.addChild(npc);
   npcs.push({ entity: npc, name, dialogLines, lineIndex: 0 });
-  registerBoxCollider(position, new pc.Vec3(1.4, 2.2, 1.4), 0.3);
+  registerBoxCollider(new pc.Vec3(position.x, position.y + 1.1, position.z), new pc.Vec3(1.4, 2.2, 1.4), 0.3);
 }
 
 // Build the Freeport-inspired zone
