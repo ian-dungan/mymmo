@@ -1,0 +1,15 @@
+{
+  "name": "MyMMO",
+  "version": "1.0.3",
+  "description": "My MMO Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
