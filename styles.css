@@ -39,8 +39,8 @@ canvas {
 
 @media (max-width: 768px) {
   .menu-toggle {
-    padding: 14px 21px;
-    font-size: 16px;
+    padding: 18px 28px;
+    font-size: 18px;
     z-index: 30;
   }
 }

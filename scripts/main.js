@@ -240,6 +240,13 @@ const supplyQuest = {
   reward: '2s + harbor favor',
 };
 
+function resetCrateAppearance() {
+  questCrates.forEach((c) => {
+    c.collected = false;
+    c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6);
+  });
+}
+
 function equipItem(item) {
   if (!item || !item.slot) return;
   const previous = equipmentSlots[item.slot];
@@ -711,6 +718,30 @@ const playerActor = createActor({
   abilities: [abilityBook.slash, abilityBook.emberBolt],
 });
 
+// UI helpers (defined early so stat sync/render calls have valid references)
+const posLabel = document.getElementById('playerPos');
+const interactionHint = document.getElementById('interactionHint');
+const dialogueEl = document.getElementById('dialogue');
+const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
+const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
+const attackButton = document.getElementById('attack-button');
+const interactButton = document.getElementById('interact-button');
+const classPanelEl = document.getElementById('classPanel');
+const questStatusEl = document.getElementById('questStatus');
+const helpContentEl = document.getElementById('helpContent');
+const inventoryContentEl = document.getElementById('inventoryContent');
+const equipmentContentEl = document.getElementById('equipmentContent');
+const nameplateEl = document.getElementById('nameplate');
+const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
+const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
+const nameplateHealthText = nameplateEl.querySelector('.nameplate-health-text');
+const menuOverlay = document.getElementById('gameMenu');
+const menuToggleBtn = document.getElementById('menuToggle');
+const menuCloseBtn = document.getElementById('menuClose');
+const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+let previousTabIndex = 0;
+
 function equipStarterSet() {
   ['leather-tunic', 'soft-boots', 'mariner-gloves', 'rusty-cutlass', 'oak-buckler', 'sapphire-charm'].forEach((id) => {
     const item = inventory.find((i) => i.id === id);
@@ -737,6 +768,10 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     selectFromCrosshair();
   }
+  if (e.key === 'Escape') {
+    if (menuOpen) closeMenu();
+    else clearTarget();
+  }
   if (e.key === '1') queuePrimaryAttack();
   if (e.key === '2') queueSecondaryAttack();
 });
@@ -751,8 +786,8 @@ function readGamepad() {
   return pads && pads.length ? pads[0] : null;
 }
 
-let previousGamepadSouth = false;
-let previousGamepadY = false;
+let previousGamepadA = false;
+let previousGamepadB = false;
 let previousGamepadEast = false;
 let previousGamepadRB = false;
 let previousGamepadDpadX = 0;
@@ -770,26 +805,39 @@ function applyGamepadLook(dt) {
   pitch -= lookY * gamepadLookSpeed * dt;
 }
 
-function pollGamepadInteract() {
+function pollGamepadConfirmCancel() {
   const pad = readGamepad();
   if (!pad || !pad.buttons || !pad.buttons.length) {
-    previousGamepadSouth = false;
+    previousGamepadA = false;
+    previousGamepadB = false;
     return;
   }
-  const south = !!(pad.buttons[0] && pad.buttons[0].pressed);
-  if (south && !previousGamepadSouth) interactionQueued = true;
-  previousGamepadSouth = south;
-}
 
-function pollGamepadMenuToggle() {
-  const pad = readGamepad();
-  if (!pad || !pad.buttons || !pad.buttons.length) {
-    previousGamepadY = false;
-    return;
+  const aPressed = !!(pad.buttons[0] && pad.buttons[0].pressed);
+  const bPressed = !!(pad.buttons[1] && pad.buttons[1].pressed);
+
+  if (aPressed && !previousGamepadA) {
+    if (menuOpen) {
+      // Confirm/acknowledge while menu is open — no-op for now.
+    } else {
+      const nearest = findNearestInteractable();
+      if (nearest?.type === 'npc') {
+        interactWithNPC(nearest.ref);
+      } else if (nearest?.type === 'crate') {
+        interactWithCrate(nearest.ref);
+      } else {
+        openMenu();
+      }
+    }
   }
-  const yPressed = !!(pad.buttons[3] && pad.buttons[3].pressed);
-  if (yPressed && !previousGamepadY) toggleMenu();
-  previousGamepadY = yPressed;
+
+  if (bPressed && !previousGamepadB) {
+    if (menuOpen) closeMenu();
+    clearTarget();
+  }
+
+  previousGamepadA = aPressed;
+  previousGamepadB = bPressed;
 }
 
 function pollGamepadAttack() {
@@ -807,26 +855,25 @@ function pollGamepadTarget() {
   const pad = readGamepad();
   if (!pad || !pad.buttons || !pad.buttons.length) {
     previousGamepadRB = false;
-    return;
-  }
-  const rb = !!(pad.buttons[5] && pad.buttons[5].pressed);
-  if (rb && !previousGamepadRB) selectFromCrosshair();
-  previousGamepadRB = rb;
-}
-
-function pollGamepadTabbing() {
-  const pad = readGamepad();
-  if (!pad || !pad.buttons || !pad.buttons.length) {
     previousGamepadDpadX = 0;
     return;
   }
+
   const left = !!(pad.buttons[14] && pad.buttons[14].pressed);
   const right = !!(pad.buttons[15] && pad.buttons[15].pressed);
   const axis = right ? 1 : left ? -1 : 0;
-  if (axis !== 0 && previousGamepadDpadX === 0 && menuOpen) {
-    stepTab(axis);
+  if (axis !== 0 && previousGamepadDpadX === 0) {
+    if (menuOpen) {
+      stepTab(axis);
+    } else {
+      cycleEnemyTarget(axis);
+    }
   }
   previousGamepadDpadX = axis;
+
+  const rb = !!(pad.buttons[5] && pad.buttons[5].pressed);
+  if (!menuOpen && rb && !previousGamepadRB) selectFromCrosshair();
+  previousGamepadRB = rb;
 }
 
 function readGamepadMove() {
@@ -837,7 +884,7 @@ function readGamepadMove() {
   const dead = 0.15;
   const x = Math.abs(dx) > dead ? dx : 0;
   const y = Math.abs(dy) > dead ? dy : 0;
-  const sprint = (pad.buttons[5] && pad.buttons[5].pressed) || (pad.buttons[0] && pad.buttons[0].pressed);
+  const sprint = (pad.buttons[6] && pad.buttons[6].pressed) || (pad.buttons[7] && pad.buttons[7].pressed);
   return { x, y, sprint };
 }
 
@@ -993,30 +1040,6 @@ app.mouse.on(pc.EVENT_MOUSEMOVE, (e) => {
 camera.setLocalPosition(10, 5.5, 0);
 camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
-// UI helpers
-const posLabel = document.getElementById('playerPos');
-const interactionHint = document.getElementById('interactionHint');
-const dialogueEl = document.getElementById('dialogue');
-const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
-const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
-const attackButton = document.getElementById('attack-button');
-const interactButton = document.getElementById('interact-button');
-const classPanelEl = document.getElementById('classPanel');
-const questStatusEl = document.getElementById('questStatus');
-const helpContentEl = document.getElementById('helpContent');
-const inventoryContentEl = document.getElementById('inventoryContent');
-const equipmentContentEl = document.getElementById('equipmentContent');
-const nameplateEl = document.getElementById('nameplate');
-const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
-const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
-const nameplateHealthText = nameplateEl.querySelector('.nameplate-health-text');
-const menuOverlay = document.getElementById('gameMenu');
-const menuToggleBtn = document.getElementById('menuToggle');
-const menuCloseBtn = document.getElementById('menuClose');
-const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
-const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
-let previousTabIndex = 0;
-
 const queueInteract = () => {
   interactionQueued = true;
 };
@@ -1105,10 +1128,10 @@ function toggleMenu() {
 
 function renderHelpPanel() {
   helpContentEl.innerHTML = `
-    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu.</div>
-    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, East face to attack, <strong>RB</strong> to target at crosshair, Y to open menu.</div>
-    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap target or use Interact, <strong>Attack</strong> for combat, top menu button for panels.</div>
-    <div><strong>Menu Tabs</strong>: Use mouse/touch to click tabs, press Q/E on keyboard to cycle, or d-pad left/right on gamepad.</div>
+    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu, <strong>Esc</strong> to cancel/clear target.</div>
+    <div><strong>Gamepad</strong>: Left stick move, Right stick look, hold triggers to sprint, <strong>A</strong> confirms (interact or opens menu), <strong>B</strong> cancels/closes menu/clears target, <strong>X</strong> attacks, <strong>RB</strong> targets under crosshair, d-pad left/right cycles enemies or tabs when a menu is open.</div>
+    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap targets or crates, <strong>Attack</strong> for combat, enlarged top menu button for panels.</div>
+    <div><strong>Menu Tabs</strong>: Use mouse/touch to click tabs, press Q/E on keyboard to cycle, or d-pad left/right on gamepad when the menu is visible.</div>
   `;
 }
 
@@ -1219,6 +1242,24 @@ function selectActor(actor) {
   updateNameplatePosition();
 }
 
+function clearTarget() {
+  selectedTarget = null;
+  updateNameplatePosition();
+}
+
+function cycleEnemyTarget(direction) {
+  const enemies = actors.filter((a) => a.type === 'enemy' && !a.dead && a.health > 0);
+  if (!enemies.length) return;
+  let index = 0;
+  if (selectedTarget && selectedTarget.type === 'enemy') {
+    const currentIndex = enemies.findIndex((e) => e.id === selectedTarget.id);
+    index = currentIndex === -1 ? 0 : (currentIndex + direction + enemies.length) % enemies.length;
+  } else if (direction < 0) {
+    index = enemies.length - 1;
+  }
+  selectActor(enemies[index]);
+}
+
 function selectFromCrosshair() {
   const cx = window.innerWidth / 2;
   const cy = window.innerHeight / 2;
@@ -1227,7 +1268,7 @@ function selectFromCrosshair() {
 
 function pickTargetAtScreen(clientX, clientY) {
   let closest = null;
-  const selectionRadius = isTouchDevice ? 220 : 110;
+  const selectionRadius = isTouchDevice ? 260 : 160;
   let closestDist = selectionRadius;
 
   actors.forEach((actor) => {
@@ -1408,7 +1449,17 @@ function queueSecondaryAttack() {
   queuedAbility = 'emberBolt';
 }
 
+function ensureSupplyQuestActive() {
+  if (supplyQuest.state === 'available') {
+    supplyQuest.state = 'active';
+    supplyQuest.progress = 0;
+    resetCrateAppearance();
+    updateQuestStatus();
+  }
+}
+
 function interactWithCrate(crate) {
+  ensureSupplyQuestActive();
   if (crate.collected || supplyQuest.state !== 'active') return;
   crate.collected = true;
   crate.entity.render.material = makeMaterial(new pc.Color(0.32, 0.24, 0.2), 0, 0.8);
@@ -1439,15 +1490,11 @@ function interactWithNPC(npc) {
 
   if (npc.questGiver) {
     if (supplyQuest.state === 'available') {
-      supplyQuest.state = 'active';
-      supplyQuest.progress = 0;
-      questCrates.forEach((c) => (c.collected = false));
-      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
+      ensureSupplyQuestActive();
     } else if (supplyQuest.state === 'ready') {
       supplyQuest.state = 'available';
       supplyQuest.progress = 0;
-      questCrates.forEach((c) => (c.collected = false));
-      questCrates.forEach((c) => (c.entity.render.material = makeMaterial(new pc.Color(0.55, 0.33, 0.19), 0.05, 0.6)));
+      resetCrateAppearance();
     }
     updateQuestStatus();
     showDialogue(npc.name, questDialogueForRyn());
@@ -1473,7 +1520,7 @@ function findNearestInteractable() {
   }
 
   questCrates.forEach((crate) => {
-    if (crate.collected || supplyQuest.state !== 'active') return;
+    if (crate.collected || (supplyQuest.state !== 'active' && supplyQuest.state !== 'available')) return;
     const dist = crate.entity.getPosition().distance(playerPos);
     if (dist <= nearestDist) {
       nearest = { type: 'crate', ref: crate };
@@ -1551,9 +1598,9 @@ function collides(position) {
 }
 
 app.on('update', (dt) => {
-  pollGamepadMenuToggle();
+  pollGamepadConfirmCancel();
   if (menuOpen) {
-    pollGamepadTabbing();
+    pollGamepadTarget();
     updateNameplatePosition();
     return;
   }
@@ -1561,7 +1608,6 @@ app.on('update', (dt) => {
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
-  pollGamepadInteract();
   pollGamepadAttack();
   pollGamepadTarget();
   handleQueuedAbility();
@@ -1630,13 +1676,13 @@ app.on('update', (dt) => {
 
   const nearest = findNearestInteractable();
   if (nearest?.type === 'npc') {
-    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.ref.name}.`;
+    interactionHint.innerHTML = `Press <strong>E</strong> / A (confirm) / tap Interact to talk to ${nearest.ref.name}.`;
     interactionHint.classList.remove('hidden');
     if (interactionQueued) {
       interactWithNPC(nearest.ref);
     }
   } else if (nearest?.type === 'crate') {
-    interactionHint.innerHTML = 'Press <strong>E</strong> / south face / tap Interact to secure this supply crate.';
+    interactionHint.innerHTML = 'Press <strong>E</strong> / A (confirm) / tap Interact to secure this supply crate.';
     interactionHint.classList.remove('hidden');
     if (interactionQueued) interactWithCrate(nearest.ref);
   } else {
