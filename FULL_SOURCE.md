@@ -252,6 +252,7 @@ let yaw = Math.PI / 2; // face toward the city from the west gate
 let pitch = -0.1;
 const velocity = new pc.Vec3();
 const direction = new pc.Vec3();
+const radToDeg = (radians) => (radians * 180) / Math.PI;
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
@@ -283,7 +284,7 @@ app.mouse.on(pc.EVENT_MOUSEMOVE, (e) => {
 });
 
 camera.setLocalPosition(-120, 5.5, 0);
-camera.setLocalEulerAngles(pc.math.radToDeg(pitch), pc.math.radToDeg(yaw), 0);
+camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
 // UI helpers
 const posLabel = document.getElementById('playerPos');
@@ -312,7 +313,7 @@ app.on('update', (dt) => {
   velocity.copy(direction).scale(speed * dt);
 
   camera.translate(velocity);
-  camera.setLocalEulerAngles(pc.math.radToDeg(pitch), pc.math.radToDeg(yaw), 0);
+  camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
   updateHud();
 });
 
