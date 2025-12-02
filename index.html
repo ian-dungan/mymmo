@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freeport Landing - PlayCanvas</title>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2313181a'/%3E%3Cpath d='M12 48L32 12l20 36H12z' fill='%23d7c38a'/%3E%3Cpath d='M24 40h16l-8-14-8 14z' fill='%23335c85'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://code.playcanvas.com/playcanvas-stable.min.js"></script>
+</head>
+<body>
+  <div class="hud">
+    <h1>Freeport Landing (Prototype)</h1>
+    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint. Tap/left-click characters to select them.</p>
+    <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+    <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
+    <div id="dialogue" class="dialogue hidden">
+      <div class="dialogue-name"></div>
+      <div class="dialogue-text"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Character</div>
+      <div id="classPanel" class="card-body"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Quest Journal</div>
+      <div id="questStatus" class="card-body">No active quests. Speak to Quartermaster Ryn.</div>
+    </div>
+  </div>
+  <div id="nameplate" class="nameplate hidden" aria-live="polite">
+    <div class="nameplate-name"></div>
+    <div class="nameplate-health">
+      <div class="health-bar"></div>
+    </div>
+  </div>
+  <div class="touch-ui">
+    <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <button id="interact-button" class="interact-button" aria-label="Interact">Interact</button>
+  </div>
+  <canvas id="application-canvas"></canvas>
+  <script src="scripts/main.js"></script>
+</body>
+</html>
