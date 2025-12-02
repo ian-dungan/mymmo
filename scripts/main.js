@@ -41,150 +41,160 @@ light.setLocalEulerAngles(55, 35, 0);
 app.root.addChild(light);
 
 // Materials
-function makeMaterial(color, metalness = 0, roughness = 0.65) {
-  const material = new pc.StandardMaterial();
-  material.diffuse = color.clone();
-  material.metalness = metalness;
-  material.useMetalness = true;
-  material.roughness = roughness;
-  material.update();
-  return material;
+function makeLambert(color, emissive = 0) {
+  const m = new pc.StandardMaterial();
+  m.diffuse = color;
+  m.emissive = color.clone().scale(emissive);
+  m.useMetalness = false;
+  m.gloss = 0.35;
+  m.update();
+  return m;
 }
 
-const palette = {
-  sand: new pc.Color(0.63, 0.58, 0.48),
-  stone: new pc.Color(0.52, 0.5, 0.46),
-  plaster: new pc.Color(0.74, 0.72, 0.66),
-  roof: new pc.Color(0.33, 0.18, 0.16),
-  water: new pc.Color(0.17, 0.36, 0.52),
-  wood: new pc.Color(0.43, 0.28, 0.18),
-};
+function makeMetal(color, metalness = 0.5, gloss = 0.5) {
+  const m = new pc.StandardMaterial();
+  m.diffuse = color;
+  m.metalness = metalness;
+  m.gloss = gloss;
+  m.useMetalness = true;
+  m.update();
+  return m;
+}
 
-// Helpers for spawning primitives
+const sandMat = makeLambert(new pc.Color(0.82, 0.76, 0.62));
+const stoneMat = makeLambert(new pc.Color(0.55, 0.6, 0.67));
+const woodMat = makeLambert(new pc.Color(0.39, 0.27, 0.16));
+const waterMat = new pc.StandardMaterial();
+waterMat.diffuse = new pc.Color(0.15, 0.32, 0.48);
+waterMat.opacity = 0.82;
+waterMat.blendType = pc.BLEND_NORMAL;
+waterMat.useMetalness = true;
+waterMat.metalness = 0.02;
+waterMat.gloss = 0.9;
+waterMat.update();
+
+const lightMat = makeLambert(new pc.Color(1.0, 0.92, 0.78), 0.2);
+
+// Helpers
 function addBox(name, size, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'box' });
-  entity.setLocalScale(size.x, size.y, size.z);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
-}
-
-function addCylinder(name, radius, height, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'cylinder' });
-  entity.setLocalScale(radius, height, radius);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
+  const e = new pc.Entity(name);
+  e.addComponent('render', { type: 'box', material });
+  e.setLocalScale(size.x, size.y, size.z);
+  e.setLocalPosition(position.x, position.y, position.z);
+  app.root.addChild(e);
+  return e;
 }
 
 function addPlane(name, size, position, material) {
-  const entity = new pc.Entity(name);
-  entity.addComponent('model', { type: 'plane' });
-  entity.setLocalScale(size.x, 1, size.z);
-  entity.setLocalPosition(position.x, position.y, position.z);
-  entity.model.material = material;
-  app.root.addChild(entity);
-  return entity;
+  const e = new pc.Entity(name);
+  e.addComponent('render', { type: 'plane', material });
+  e.setLocalScale(size.x, size.y, size.z);
+  e.setLocalPosition(position.x, position.y, position.z);
+  app.root.addChild(e);
+  return e;
 }
 
-// Build the Freeport-inspired zone
-function buildFreeportLanding() {
-  // Ground and harbor water
-  addPlane('ground', new pc.Vec3(280, 1, 280), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
-  const water = addPlane('harbor-water', new pc.Vec3(200, 1, 160), new pc.Vec3(120, -0.3, 80), makeMaterial(palette.water, 0.1, 0.4));
-  water.model.castShadows = false;
+// Ground and harbor
+addPlane('ground', new pc.Vec3(800, 1, 800), new pc.Vec3(0, 0, 0), sandMat);
+addPlane('water', new pc.Vec3(400, 1, 400), new pc.Vec3(-120, 0.02, -120), waterMat);
 
-  // City walls
-  const wallMat = makeMaterial(palette.stone, 0, 0.7);
-  const wallHeight = 12;
-  const wallThickness = 4;
-  const extent = 120;
-  addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat);
-  addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat);
-  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat);
+// City walls
+const wallHeight = 18;
+const wallThickness = 6;
+addBox('wall-north', new pc.Vec3(200, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -120), stoneMat);
+addBox('wall-south', new pc.Vec3(200, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, 120), stoneMat);
+addBox('wall-east', new pc.Vec3(wallThickness, wallHeight, 200), new pc.Vec3(100, wallHeight / 2, 0), stoneMat);
+addBox('wall-west', new pc.Vec3(wallThickness, wallHeight, 200), new pc.Vec3(-100, wallHeight / 2, 0), stoneMat);
 
-  // Gate and watchtowers facing the harbor
-  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10), wallMat);
-  addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6));
-  addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6));
+// Gate and towers
+addBox('gate', new pc.Vec3(30, 14, wallThickness + 1), new pc.Vec3(0, 7, -120), stoneMat);
+addBox('tower-ne', new pc.Vec3(18, 28, 18), new pc.Vec3(90, 14, -110), stoneMat);
+addBox('tower-nw', new pc.Vec3(18, 28, 18), new pc.Vec3(-90, 14, -110), stoneMat);
+addBox('tower-se', new pc.Vec3(18, 28, 18), new pc.Vec3(90, 14, 110), stoneMat);
+addBox('tower-sw', new pc.Vec3(18, 28, 18), new pc.Vec3(-90, 14, 110), stoneMat);
 
-  // Docks and pier
-  const dockMat = makeMaterial(palette.wood, 0.05, 0.65);
-  addBox('main-dock', new pc.Vec3(60, 1.2, 12), new pc.Vec3(extent + 24, 0.6, 24), dockMat);
-  addBox('pier-a', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 40, 0.5, 44), dockMat);
-  addBox('pier-b', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 8, 0.5, 44), dockMat);
-
-  // Central plaza
-  addPlane('plaza', new pc.Vec3(80, 1, 80), new pc.Vec3(-20, 0.05, 10), makeMaterial(palette.plaster, 0, 0.95));
-  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(-20, 5, 10), makeMaterial(palette.roof, 0.15, 0.4));
-
-  // Inns and market stalls
-  const houseMat = makeMaterial(palette.plaster, 0, 0.82);
-  const roofMat = makeMaterial(palette.roof, 0, 0.55);
-  const homes = [
-    { pos: new pc.Vec3(-40, 3, -10), size: new pc.Vec3(16, 6, 14) },
-    { pos: new pc.Vec3(-68, 3, 30), size: new pc.Vec3(18, 6, 16) },
-    { pos: new pc.Vec3(10, 3, -34), size: new pc.Vec3(20, 7, 16) },
-    { pos: new pc.Vec3(30, 3, 30), size: new pc.Vec3(22, 7, 16) },
-  ];
-  homes.forEach((home, i) => {
-    const base = addBox(`home-${i}`, home.size, home.pos, houseMat);
-    addBox(`home-${i}-roof`, new pc.Vec3(home.size.x * 1.05, home.size.y * 0.3, home.size.z * 1.05), new pc.Vec3(home.pos.x, home.pos.y + home.size.y * 0.6, home.pos.z), roofMat);
-    base.model.castShadows = true;
-  });
-
-  // Hall and barracks near the gate
-  addBox('hall', new pc.Vec3(32, 10, 18), new pc.Vec3(60, 5, -20), houseMat);
-  addBox('hall-roof', new pc.Vec3(34, 3, 20), new pc.Vec3(60, 11.5, -20), roofMat);
-  addBox('barracks', new pc.Vec3(28, 8, 14), new pc.Vec3(40, 4, 24), houseMat);
-  addBox('barracks-roof', new pc.Vec3(30, 2.5, 16), new pc.Vec3(40, 9, 24), roofMat);
-
-  // Pathways
-  const pathMat = makeMaterial(new pc.Color(0.46, 0.43, 0.38), 0, 0.95);
-  addPlane('main-road', new pc.Vec3(20, 1, 200), new pc.Vec3(60, 0.04, 0), pathMat);
-  addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
-  addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
+// Docks
+for (let i = 0; i < 4; i++) {
+  const offset = i * 30;
+  addBox(`dock-${i}`, new pc.Vec3(12, 2, 40), new pc.Vec3(-140 - offset, 1, -120 - 20), woodMat);
+  addBox(`dock-ramp-${i}`, new pc.Vec3(12, 2, 16), new pc.Vec3(-140 - offset, 1, -100), woodMat);
 }
 
-buildFreeportLanding();
+// Plaza and market
+addBox('plaza', new pc.Vec3(60, 1, 60), new pc.Vec3(0, 0.5, 10), lightMat);
+addBox('market-1', new pc.Vec3(18, 10, 12), new pc.Vec3(-25, 5, 10), woodMat);
+addBox('market-2', new pc.Vec3(18, 10, 12), new pc.Vec3(0, 5, 10), woodMat);
+addBox('market-3', new pc.Vec3(18, 10, 12), new pc.Vec3(25, 5, 10), woodMat);
+addBox('inn', new pc.Vec3(30, 16, 20), new pc.Vec3(0, 8, 40), woodMat);
 
-// Player movement handling
-const moveSpeed = 10;
-const sprintMultiplier = 1.8;
-const rotSpeed = 0.0022;
-let yaw = 0;
-let pitch = -0.1;
-const velocity = new pc.Vec3();
-const direction = new pc.Vec3();
+// Roads
+addBox('road-main', new pc.Vec3(30, 0.6, 140), new pc.Vec3(0, 0.3, 40), makeLambert(new pc.Color(0.45, 0.42, 0.38)));
+addBox('road-side-1', new pc.Vec3(16, 0.6, 60), new pc.Vec3(-30, 0.3, 0), makeLambert(new pc.Color(0.45, 0.42, 0.38)));
+addBox('road-side-2', new pc.Vec3(16, 0.6, 60), new pc.Vec3(30, 0.3, 0), makeLambert(new pc.Color(0.45, 0.42, 0.38)));
 
+// Harbor details
+for (let i = 0; i < 10; i++) {
+  const x = -120 - i * 14;
+  addBox(`crate-${i}`, new pc.Vec3(4, 4 + (i % 3) * 2, 4), new pc.Vec3(x, 2 + (i % 3), -100 - (i % 2) * 6), woodMat);
+}
+
+// City interior scatter
+for (let i = 0; i < 20; i++) {
+  const x = pc.math.lerp(-70, 70, Math.random());
+  const z = pc.math.lerp(-30, 80, Math.random());
+  addBox(`house-${i}`, new pc.Vec3(12 + Math.random() * 8, 8 + Math.random() * 6, 12 + Math.random() * 6), new pc.Vec3(x, 4, z), woodMat);
+}
+
+// Simple fog/atmosphere
+app.scene.fog = pc.FOG_LINEAR;
+app.scene.fogColor = new pc.Color(0.12, 0.16, 0.21);
+app.scene.fogStart = 120;
+app.scene.fogEnd = 280;
+
+// Controls
 const keys = { w: false, a: false, s: false, d: false, shift: false };
+const moveSpeed = 22;
+const sprintMultiplier = 1.7;
+const direction = new pc.Vec3();
+const velocity = new pc.Vec3();
+
 window.addEventListener('keydown', (e) => {
-  if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
+  if (e.code === 'KeyW') keys.w = true;
+  if (e.code === 'KeyA') keys.a = true;
+  if (e.code === 'KeyS') keys.s = true;
+  if (e.code === 'KeyD') keys.d = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
 });
+
 window.addEventListener('keyup', (e) => {
-  if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
+  if (e.code === 'KeyW') keys.w = false;
+  if (e.code === 'KeyA') keys.a = false;
+  if (e.code === 'KeyS') keys.s = false;
+  if (e.code === 'KeyD') keys.d = false;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
 });
 
-// Pointer lock for mouselook
-canvas.addEventListener('click', () => {
-  if (!document.pointerLockElement) {
+// Mouse look
+let yaw = 0;
+let pitch = 0;
+const rotSpeed = 0.0025;
+
+function lockPointer() {
+  if (document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();
+  }
+}
+
+canvas.addEventListener('click', lockPointer);
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement !== canvas) {
+    // Unlocking pointer
   }
 });
 
-document.addEventListener('pointerlockchange', () => {
-  const locked = document.pointerLockElement === canvas;
-  app.mouse.enabled = locked;
-});
-
-app.mouse.on(pc.EVENT_MOUSEMOVE, (e) => {
-  if (!document.pointerLockElement) return;
+const mouse = app.mouse;
+mouse.on('mousemove', (e) => {
+  if (document.pointerLockElement !== canvas) return;
   yaw -= e.dx * rotSpeed;
   pitch -= e.dy * rotSpeed;
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
