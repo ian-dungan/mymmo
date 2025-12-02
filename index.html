@@ -16,10 +16,16 @@
     <h1>Freeport Landing (Prototype)</h1>
     <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
     <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+    <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
+    <div id="dialogue" class="dialogue hidden">
+      <div class="dialogue-name"></div>
+      <div class="dialogue-text"></div>
+    </div>
   </div>
   <div class="touch-ui">
     <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
     <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <button id="interact-button" class="interact-button" aria-label="Interact">Interact</button>
   </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>

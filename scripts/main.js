@@ -58,10 +58,14 @@ const palette = {
   roof: new pc.Color(0.33, 0.18, 0.16),
   water: new pc.Color(0.17, 0.36, 0.52),
   wood: new pc.Color(0.43, 0.28, 0.18),
+  cloth: new pc.Color(0.66, 0.52, 0.24),
+  noble: new pc.Color(0.52, 0.24, 0.52),
+  sailor: new pc.Color(0.24, 0.46, 0.74),
 };
 
 // Helpers for spawning primitives
 const colliders = [];
+const npcs = [];
 
 function registerBoxCollider(position, size, padding = 0.6) {
   colliders.push({
@@ -103,6 +107,18 @@ function addPlane(name, size, position, material, withCollider = false) {
   app.root.addChild(entity);
   if (withCollider) registerBoxCollider(position, size, 0.2);
   return entity;
+}
+
+function addNPC(name, position, bodyColor, dialogLines) {
+  const npc = new pc.Entity(name);
+  npc.addComponent('render', { type: 'capsule' });
+  npc.setLocalScale(1.1, 2.2, 1.1);
+  npc.setLocalPosition(position);
+  npc.render.material = makeMaterial(bodyColor, 0, 0.55);
+  npc.castShadows = true;
+  app.root.addChild(npc);
+  npcs.push({ entity: npc, name, dialogLines, lineIndex: 0 });
+  registerBoxCollider(position, new pc.Vec3(1.4, 2.2, 1.4), 0.3);
 }
 
 // Build the Freeport-inspired zone
@@ -162,6 +178,20 @@ function buildFreeportLanding() {
   addPlane('main-road', new pc.Vec3(20, 1, 200), new pc.Vec3(60, 0.04, 0), pathMat);
   addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
   addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
+
+  // NPCs
+  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), palette.sailor, [
+    'Busy day at the docks. Ships from Qeynos arrived at dawn.',
+    'If you head inland, watch for the market patrols—they keep things tidy.',
+  ]);
+  addNPC('Quartermaster Ryn', new pc.Vec3(40, 0, -14), palette.cloth, [
+    'Supplies are thin, but the Freeport guard always gets first pick.',
+    'Need armor? The smithy by the north wall can size you up.',
+  ]);
+  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), palette.noble, [
+    'The sea breeze carries whispers of distant isles.',
+    'When the bells toll at dusk, the harbor gates close—plan your return.',
+  ]);
 }
 
 buildFreeportLanding();
@@ -171,17 +201,20 @@ const moveSpeed = 10;
 const sprintMultiplier = 1.8;
 const rotSpeed = 0.0022;
 const gamepadLookSpeed = 2.4;
-const touchLookSpeed = 0.050; // slower mobile look to reduce sensitivity
+const touchLookSpeed = 0.75; // slower mobile look to reduce sensitivity
 let yaw = Math.PI / 2; // face toward the city from the west gate
 let pitch = -0.1;
 const velocity = new pc.Vec3();
 const direction = new pc.Vec3();
 const radToDeg = (radians) => (radians * 180) / Math.PI;
+const interactRadius = 5.5;
+let interactionQueued = false;
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
+  if (e.key.toLowerCase() === 'e') interactionQueued = true;
 });
 window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
@@ -194,6 +227,8 @@ function readGamepad() {
   return pads && pads.length ? pads[0] : null;
 }
 
+let previousGamepadSouth = false;
+
 function applyGamepadLook(dt) {
   const pad = readGamepad();
   if (!pad) return;
@@ -204,6 +239,17 @@ function applyGamepadLook(dt) {
   const lookY = Math.abs(ly) > dead ? ly : 0;
   yaw -= lookX * gamepadLookSpeed * dt;
   pitch -= lookY * gamepadLookSpeed * dt;
+}
+
+function pollGamepadInteract() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadSouth = false;
+    return;
+  }
+  const south = !!(pad.buttons[0] && pad.buttons[0].pressed);
+  if (south && !previousGamepadSouth) interactionQueued = true;
+  previousGamepadSouth = south;
 }
 
 function readGamepadMove() {
@@ -338,9 +384,45 @@ camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
 // UI helpers
 const posLabel = document.getElementById('playerPos');
+const interactionHint = document.getElementById('interactionHint');
+const dialogueEl = document.getElementById('dialogue');
+const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
+const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
+const interactButton = document.getElementById('interact-button');
+
+interactButton.addEventListener('click', () => {
+  interactionQueued = true;
+});
+
 function updateHud() {
   const p = camera.getPosition();
   posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
+}
+
+function findNearestNPC() {
+  const playerPos = camera.getPosition();
+  let nearest = null;
+  let nearestDist = interactRadius;
+  for (const npc of npcs) {
+    const dist = npc.entity.getPosition().distance(playerPos);
+    if (dist <= nearestDist) {
+      nearest = npc;
+      nearestDist = dist;
+    }
+  }
+  return nearest;
+}
+
+function showDialogue(npc) {
+  if (!npc) {
+    dialogueEl.classList.add('hidden');
+    return;
+  }
+  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
+  npc.lineIndex += 1;
+  dialogueNameEl.textContent = npc.name;
+  dialogueTextEl.textContent = line;
+  dialogueEl.classList.remove('hidden');
 }
 
 function collides(position) {
@@ -358,6 +440,7 @@ app.on('update', (dt) => {
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
+  pollGamepadInteract();
 
   // build local basis
   const forward = camera.forward.clone();
@@ -408,6 +491,17 @@ app.on('update', (dt) => {
 
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
+
+  const nearest = findNearestNPC();
+  if (nearest) {
+    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.name}.`;
+    if (interactionQueued) {
+      showDialogue(nearest);
+    }
+  } else {
+    interactionHint.innerHTML = 'Walk up to someone and press <strong>E</strong> / south face / tap Interact.';
+  }
+  interactionQueued = false;
   updateHud();
 });
 

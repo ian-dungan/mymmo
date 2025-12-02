@@ -23,10 +23,16 @@ Copy-paste these into fresh files to restore the working prototype.
     <h1>Freeport Landing (Prototype)</h1>
     <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
     <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+    <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
+    <div id="dialogue" class="dialogue hidden">
+      <div class="dialogue-name"></div>
+      <div class="dialogue-text"></div>
+    </div>
   </div>
   <div class="touch-ui">
     <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
     <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <button id="interact-button" class="interact-button" aria-label="Interact">Interact</button>
   </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>
@@ -85,6 +91,35 @@ canvas {
   font-size: 13px;
 }
 
+.interaction {
+  margin-top: 10px;
+  color: #f1e6c5;
+}
+
+.dialogue {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f4f5f7;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dialogue-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.dialogue-text {
+  line-height: 1.45;
+}
+
+.hidden {
+  display: none;
+}
+
 .touch-ui {
   position: fixed;
   inset: 0;
@@ -122,6 +157,26 @@ canvas {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.interact-button {
+  position: absolute;
+  right: 22px;
+  bottom: 150px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.15);
+  color: #0c121c;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.interact-button:active {
+  transform: translateY(1px);
 }
 
 @media (max-width: 600px) {
@@ -194,10 +249,14 @@ const palette = {
   roof: new pc.Color(0.33, 0.18, 0.16),
   water: new pc.Color(0.17, 0.36, 0.52),
   wood: new pc.Color(0.43, 0.28, 0.18),
+  cloth: new pc.Color(0.66, 0.52, 0.24),
+  noble: new pc.Color(0.52, 0.24, 0.52),
+  sailor: new pc.Color(0.24, 0.46, 0.74),
 };
 
 // Helpers for spawning primitives
 const colliders = [];
+const npcs = [];
 
 function registerBoxCollider(position, size, padding = 0.6) {
   colliders.push({
@@ -239,6 +298,18 @@ function addPlane(name, size, position, material, withCollider = false) {
   app.root.addChild(entity);
   if (withCollider) registerBoxCollider(position, size, 0.2);
   return entity;
+}
+
+function addNPC(name, position, bodyColor, dialogLines) {
+  const npc = new pc.Entity(name);
+  npc.addComponent('render', { type: 'capsule' });
+  npc.setLocalScale(1.1, 2.2, 1.1);
+  npc.setLocalPosition(position);
+  npc.render.material = makeMaterial(bodyColor, 0, 0.55);
+  npc.castShadows = true;
+  app.root.addChild(npc);
+  npcs.push({ entity: npc, name, dialogLines, lineIndex: 0 });
+  registerBoxCollider(position, new pc.Vec3(1.4, 2.2, 1.4), 0.3);
 }
 
 // Build the Freeport-inspired zone
@@ -298,6 +369,20 @@ function buildFreeportLanding() {
   addPlane('main-road', new pc.Vec3(20, 1, 200), new pc.Vec3(60, 0.04, 0), pathMat);
   addPlane('plaza-road', new pc.Vec3(60, 1, 16), new pc.Vec3(0, 0.04, 0), pathMat);
   addPlane('plaza-road-west', new pc.Vec3(16, 1, 80), new pc.Vec3(-40, 0.04, 10), pathMat);
+
+  // NPCs
+  addNPC('Dockhand Mira', new pc.Vec3(110, 0, 30), palette.sailor, [
+    'Busy day at the docks. Ships from Qeynos arrived at dawn.',
+    'If you head inland, watch for the market patrols—they keep things tidy.',
+  ]);
+  addNPC('Quartermaster Ryn', new pc.Vec3(40, 0, -14), palette.cloth, [
+    'Supplies are thin, but the Freeport guard always gets first pick.',
+    'Need armor? The smithy by the north wall can size you up.',
+  ]);
+  addNPC('Harbor Sage Lyra', new pc.Vec3(10, 0, 32), palette.noble, [
+    'The sea breeze carries whispers of distant isles.',
+    'When the bells toll at dusk, the harbor gates close—plan your return.',
+  ]);
 }
 
 buildFreeportLanding();
@@ -313,11 +398,14 @@ let pitch = -0.1;
 const velocity = new pc.Vec3();
 const direction = new pc.Vec3();
 const radToDeg = (radians) => (radians * 180) / Math.PI;
+const interactRadius = 5.5;
+let interactionQueued = false;
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
+  if (e.key.toLowerCase() === 'e') interactionQueued = true;
 });
 window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
@@ -330,6 +418,8 @@ function readGamepad() {
   return pads && pads.length ? pads[0] : null;
 }
 
+let previousGamepadSouth = false;
+
 function applyGamepadLook(dt) {
   const pad = readGamepad();
   if (!pad) return;
@@ -340,6 +430,17 @@ function applyGamepadLook(dt) {
   const lookY = Math.abs(ly) > dead ? ly : 0;
   yaw -= lookX * gamepadLookSpeed * dt;
   pitch -= lookY * gamepadLookSpeed * dt;
+}
+
+function pollGamepadInteract() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadSouth = false;
+    return;
+  }
+  const south = !!(pad.buttons[0] && pad.buttons[0].pressed);
+  if (south && !previousGamepadSouth) interactionQueued = true;
+  previousGamepadSouth = south;
 }
 
 function readGamepadMove() {
@@ -428,11 +529,15 @@ function handleTouchEnd(e) {
 }
 
 ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((evt) => {
-  document.addEventListener(evt, (e) => {
-    if (evt === 'touchstart') handleTouchStart(e);
-    else if (evt === 'touchmove') handleTouchMove(e);
-    else handleTouchEnd(e);
-  }, { passive: false });
+  document.addEventListener(
+    evt,
+    (e) => {
+      if (evt === 'touchstart') handleTouchStart(e);
+      else if (evt === 'touchmove') handleTouchMove(e);
+      else handleTouchEnd(e);
+    },
+    { passive: false },
+  );
 });
 
 function getTouchMoveVector() {
@@ -474,9 +579,45 @@ camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
 // UI helpers
 const posLabel = document.getElementById('playerPos');
+const interactionHint = document.getElementById('interactionHint');
+const dialogueEl = document.getElementById('dialogue');
+const dialogueNameEl = dialogueEl.querySelector('.dialogue-name');
+const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
+const interactButton = document.getElementById('interact-button');
+
+interactButton.addEventListener('click', () => {
+  interactionQueued = true;
+});
+
 function updateHud() {
   const p = camera.getPosition();
   posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
+}
+
+function findNearestNPC() {
+  const playerPos = camera.getPosition();
+  let nearest = null;
+  let nearestDist = interactRadius;
+  for (const npc of npcs) {
+    const dist = npc.entity.getPosition().distance(playerPos);
+    if (dist <= nearestDist) {
+      nearest = npc;
+      nearestDist = dist;
+    }
+  }
+  return nearest;
+}
+
+function showDialogue(npc) {
+  if (!npc) {
+    dialogueEl.classList.add('hidden');
+    return;
+  }
+  const line = npc.dialogLines[npc.lineIndex % npc.dialogLines.length];
+  npc.lineIndex += 1;
+  dialogueNameEl.textContent = npc.name;
+  dialogueTextEl.textContent = line;
+  dialogueEl.classList.remove('hidden');
 }
 
 function collides(position) {
@@ -494,6 +635,7 @@ app.on('update', (dt) => {
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
+  pollGamepadInteract();
 
   // build local basis
   const forward = camera.forward.clone();
@@ -544,9 +686,82 @@ app.on('update', (dt) => {
 
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
+
+  const nearest = findNearestNPC();
+  if (nearest) {
+    interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.name}.`;
+    if (interactionQueued) {
+      showDialogue(nearest);
+    }
+  } else {
+    interactionHint.innerHTML = 'Walk up to someone and press <strong>E</strong> / south face / tap Interact.';
+  }
+  interactionQueued = false;
   updateHud();
 });
 
 updateHud();
 app.start();
+```
+
+---
+## README.md
+```markdown
+# Freeport Landing (PlayCanvas)
+A single-zone prototype inspired by EverQuest's Freeport harbor. Walk the docks, city walls, and plaza to test controls and scale.
+Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift/RB** or the **south face button** to sprint. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers.
+
+## Files you need
+- `index.html`: Loads the PlayCanvas engine from the CDN, wires up the HUD, and mounts the canvas.
+- `scripts/main.js`: Builds the Freeport scene, prevents walking through walls, adds a few interactive NPCs, and sets up camera controls (keyboard, gamepad, and touch).
+- `styles.css`: Full-viewport canvas styling and HUD appearance.
+- `README.md`: This guide.
+- `FULL_SOURCE.md`: A copy-paste-ready listing of every source file in this prototype.
+
+## Running locally
+Open `index.html` in a modern browser (or serve the folder with any static server) to try the prototype.
+
+### Talking to NPCs
+- Walk within a few meters of an NPC to see their name in the HUD.
+- Press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
+
+## Git remote
+This workspace is configured with the GitHub remote:
+
+- `origin`: https://github.com/ian-dungan/mymmo.git
+
+If you need to re-create it, run:
+
+```bash
+git remote add origin https://github.com/ian-dungan/mymmo.git
+```
+
+## Pushing your changes
+When you are ready to publish your work, push the current branch to GitHub:
+
+```bash
+git push origin work
+```
+
+If you want the branch to become the default line of development, open a pull request on GitHub and merge it into `main`.
+
+## Committing and pushing in one go
+If you've made local edits and want to save them to the repo, run the full flow:
+
+```bash
+git status          # review what's changed
+git add <files>     # or `git add .` for everything
+git commit -m "describe your change"
+git push origin work
+```
+
+After pushing, create or update a pull request on GitHub to merge the `work` branch into `main` when you're satisfied.
+
+## Resolving merge conflicts on GitHub
+When GitHub shows conflict markers, the options in the UI map to the versions of the file like this:
+- **Current change**: your branch's version of the code.
+- **Incoming change**: the version from the branch you are merging into yours (often `main` or a PR source).
+- **Accept both**: keeps both blocks so you can manually edit them into a single clean result afterward.
+
+Choose the block that has the correct logic or content. After accepting, edit the merged text to remove duplicates or leftover markers, then save and commit the resolution.
 ```

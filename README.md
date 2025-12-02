@@ -4,13 +4,17 @@ Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold
 
 ## Files you need
 - `index.html`: Loads the PlayCanvas engine from the CDN, wires up the HUD, and mounts the canvas.
-- `scripts/main.js`: Builds the Freeport scene, prevents walking through walls, and sets up camera controls (keyboard, gamepad, and touch).
+- `scripts/main.js`: Builds the Freeport scene, prevents walking through walls, adds a few interactive NPCs, and sets up camera controls (keyboard, gamepad, and touch).
 - `styles.css`: Full-viewport canvas styling and HUD appearance.
 - `README.md`: This guide.
 - `FULL_SOURCE.md`: A copy-paste-ready listing of every source file in this prototype.
 
 ## Running locally
 Open `index.html` in a modern browser (or serve the folder with any static server) to try the prototype.
+
+### Talking to NPCs
+- Walk within a few meters of an NPC to see their name in the HUD.
+- Press **E** (keyboard), the **south face** button on a gamepad, or tap the on-screen **Interact** button on mobile to cycle through their lines.
 
 ## Git remote
 This workspace is configured with the GitHub remote:
