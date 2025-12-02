@@ -583,6 +583,7 @@ const inventoryContentEl = document.getElementById('inventoryContent');
 const nameplateEl = document.getElementById('nameplate');
 const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
 const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
+const nameplateHealthText = nameplateEl.querySelector('.nameplate-health-text');
 const menuOverlay = document.getElementById('gameMenu');
 const menuToggleBtn = document.getElementById('menuToggle');
 const menuCloseBtn = document.getElementById('menuClose');
@@ -594,7 +595,15 @@ interactButton.addEventListener('click', () => {
 });
 
 menuToggleBtn.addEventListener('click', () => toggleMenu());
+menuToggleBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  toggleMenu();
+});
 menuCloseBtn.addEventListener('click', () => closeMenu());
+menuCloseBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  closeMenu();
+});
 
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => setTab(btn.dataset.tab));
@@ -701,6 +710,7 @@ function updateNameplatePosition() {
   nameplateNameEl.textContent = `${selectedTarget.name}`;
   const ratio = selectedTarget.health / selectedTarget.maxHealth;
   nameplateHealthBar.style.width = `${Math.max(5, ratio * 100)}%`;
+  nameplateHealthText.textContent = `${Math.round(selectedTarget.health)}/${Math.round(selectedTarget.maxHealth)} HP`;
   nameplateEl.classList.remove('hidden');
 }
 
