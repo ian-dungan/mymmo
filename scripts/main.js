@@ -1561,6 +1561,11 @@ function updateInventoryPanel() {
       ? `<div class="card-body subtle">Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}</div>`
       : `<div class="card-body subtle">Pick up marked crates around the docks to fill this quest.</div>`;
 
+  const stats = buildPlayerStats();
+  const carryWeight = inventory.length * 3;
+  const maxWeight = 80;
+  const vitalsLine = `HP ${Math.round(playerState.health)}/${stats.HP} · Mana ${Math.round(playerState.mana)}/${stats.Mana} · AC ${stats.AC}`;
+
   const slots = [];
   for (let i = 0; i < bagCapacity; i++) {
     const item = inventory[i];
@@ -1574,29 +1579,43 @@ function updateInventoryPanel() {
           )})</button>`
         : '';
       slots.push(`
-        <div class="bag-slot">
-          <div>
-            <div class="bag-item-name">${item.name}</div>
-            <div class="bag-item-slot">${item.slot ? `Equip: ${item.slot}` : 'Carry/Use'} · ${formatValueCopper(item.value || 0)}</div>
-            <div class="subtle">${item.note || ''}</div>
-            <div class="statline">${statLine(item.stats)}</div>
+        <div class="inv-slot">
+          <div class="inv-icon">${(item.slot || 'Item').slice(0, 1)}</div>
+          <div class="inv-details">
+            <div class="inv-name">${item.name}</div>
+            <div class="inv-meta">${item.slot ? `Equip: ${item.slot}` : 'Carry/Use'} · ${formatValueCopper(item.value || 0)}</div>
+            <div class="inv-note">${item.note || ''}</div>
+            <div class="inv-stats">${statLine(item.stats)}</div>
           </div>
           <div class="bag-actions">${equipButton}${sellButton}</div>
         </div>
       `);
     } else {
-      slots.push('<div class="bag-slot empty">Empty slot</div>');
+      slots.push('<div class="inv-slot empty"><div class="inv-icon">—</div><div class="inv-details">Empty slot</div></div>');
     }
   }
 
   inventoryContentEl.innerHTML = `
-    <div class="currency-row">
-      <span>Bags: ${inventory.length}/${bagCapacity}</span>
-      <span class="currency-value">${formatCurrency()}</span>
+      <div class="inventory-window">
+        <div class="inv-top">
+          <div>
+            <div class="inv-char-name">${playerProfile.name}</div>
+            <div class="inv-char-sub">${playerProfile.classKey} · Level ${playerProfile.level}</div>
+            <div class="inv-char-stats">${vitalsLine}</div>
+          </div>
+          <div class="inv-currency">
+            <div class="currency-label">Coin</div>
+            <div class="currency-value">${formatCurrency()}</div>
+        </div>
+      </div>
+      <div class="inv-row">
+        <div>Bags: ${inventory.length}/${bagCapacity}</div>
+        <div>Weight: ${carryWeight}/${maxWeight}</div>
+      </div>
+      <div class="card-body">Bags show items as icon squares like classic fantasy RPGs. Equip gear to move it to your worn set, or sell extra finds to merchants.</div>
+      ${questLine}
+      <div class="inv-grid">${slots.join('')}</div>
     </div>
-    <div class="card-body">Backpack slots ready for loot and spare gear. Equip pieces to move them into your worn set.</div>
-    ${questLine}
-    <div class="bag-grid">${slots.join('')}</div>
   `;
 }
 
