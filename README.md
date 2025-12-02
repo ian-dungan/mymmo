@@ -12,6 +12,38 @@ Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold
 ## Running locally
 Open `index.html` in a modern browser (or serve the folder with any static server) to try the prototype.
 
+## Git remote
+This workspace is configured with the GitHub remote:
+
+- `origin`: https://github.com/ian-dungan/mymmo.git
+
+If you need to re-create it, run:
+
+```bash
+git remote add origin https://github.com/ian-dungan/mymmo.git
+```
+
+## Pushing your changes
+When you are ready to publish your work, push the current branch to GitHub:
+
+```bash
+git push origin work
+```
+
+If you want the branch to become the default line of development, open a pull request on GitHub and merge it into `main`.
+
+## Committing and pushing in one go
+If you've made local edits and want to save them to the repo, run the full flow:
+
+```bash
+git status          # review what's changed
+git add <files>     # or `git add .` for everything
+git commit -m "describe your change"
+git push origin work
+```
+
+After pushing, create or update a pull request on GitHub to merge the `work` branch into `main` when you're satisfied.
+
 ## Resolving merge conflicts on GitHub
 When GitHub shows conflict markers, the options in the UI map to the versions of the file like this:
 - **Current change**: your branch's version of the code.
