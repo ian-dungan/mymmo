@@ -18,6 +18,9 @@ app.scene.toneMapping = pc.TONEMAP_ACES;
 app.scene.exposure = 1.1;
 app.scene.skyboxMip = 2;
 app.scene.ambientLight = new pc.Color(0.25, 0.28, 0.35);
+app.scene.fog = pc.FOG_EXP;
+app.scene.fogColor = new pc.Color(0.54, 0.66, 0.78);
+app.scene.fogDensity = 0.0038;
 
 // Player entity (camera)
 const camera = new pc.Entity('camera');
@@ -25,6 +28,8 @@ camera.addComponent('camera', {
   clearColor: new pc.Color(0.13, 0.18, 0.26),
   fov: 70,
 });
+camera.camera.nearClip = 0.25;
+camera.camera.farClip = 1800;
 app.root.addChild(camera);
 
 // Light
@@ -52,18 +57,23 @@ function makeMaterial(color, metalness = 0, roughness = 0.65) {
 }
 
 const palette = {
-  sand: new pc.Color(0.63, 0.58, 0.48),
-  stone: new pc.Color(0.52, 0.5, 0.46),
-  plaster: new pc.Color(0.74, 0.72, 0.66),
-  roof: new pc.Color(0.33, 0.18, 0.16),
-  water: new pc.Color(0.17, 0.36, 0.52),
-  wood: new pc.Color(0.43, 0.28, 0.18),
-  cloth: new pc.Color(0.66, 0.52, 0.24),
-  noble: new pc.Color(0.52, 0.24, 0.52),
-  sailor: new pc.Color(0.24, 0.46, 0.74),
-  desertSand: new pc.Color(0.76, 0.69, 0.52),
-  oasisWater: new pc.Color(0.1, 0.44, 0.52),
+  sand: new pc.Color(0.58, 0.52, 0.43),
+  stone: new pc.Color(0.48, 0.47, 0.43),
+  plaster: new pc.Color(0.78, 0.74, 0.68),
+  roof: new pc.Color(0.32, 0.16, 0.12),
+  water: new pc.Color(0.12, 0.32, 0.48),
+  wood: new pc.Color(0.39, 0.26, 0.18),
+  cloth: new pc.Color(0.64, 0.52, 0.3),
+  noble: new pc.Color(0.52, 0.26, 0.52),
+  sailor: new pc.Color(0.22, 0.44, 0.68),
+  desertSand: new pc.Color(0.7, 0.62, 0.48),
+  oasisWater: new pc.Color(0.09, 0.42, 0.5),
 };
+
+const fogDayColor = new pc.Color(0.56, 0.7, 0.82);
+const fogNightColor = new pc.Color(0.08, 0.1, 0.15);
+const fogDayDensity = 0.0032;
+const fogNightDensity = 0.0062;
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -76,6 +86,8 @@ function mixColor(a, b, t, out = new pc.Color()) {
 
 const lanterns = [];
 const rotatingBeacons = [];
+const waterSurfaces = [];
+let waterTime = 0;
 let timeOfDay = 85; // seconds into the day cycle
 const dayDuration = 260; // seconds per full day/night
 const dayColor = new pc.Color(0.54, 0.66, 0.86);
@@ -83,6 +95,7 @@ const duskColor = new pc.Color(0.13, 0.1, 0.18);
 const ambientDay = new pc.Color(0.32, 0.35, 0.4);
 const ambientNight = new pc.Color(0.08, 0.1, 0.14);
 const tmpColor = new pc.Color();
+const waterTint = new pc.Color();
 
 const freeportScale = 20;
 const desertStartX = 1800;
@@ -491,6 +504,14 @@ function addPlane(name, size, position, material, withCollider = false) {
   return entity;
 }
 
+function addWaterSurface(name, size, position, color) {
+  const material = makeMaterial(color, 0.35, 0.22);
+  const entity = addPlane(name, size, position, material, false);
+  entity.render.castShadows = false;
+  waterSurfaces.push({ material, baseColor: color.clone() });
+  return entity;
+}
+
 function addLantern(name, position, height = 7, range = 24) {
   const post = new pc.Entity(`${name}-post`);
   post.addComponent('render', { type: 'cylinder' });
@@ -539,6 +560,27 @@ function addLighthouse(name, position) {
   rotatingBeacons.push({ entity: beacon, speed: 18 });
   app.root.addChild(beacon);
   return tower;
+}
+
+function addRockCluster(name, center, count, radius, heightRange = [1.8, 3.6]) {
+  for (let i = 0; i < count; i += 1) {
+    const offset = new pc.Vec3(
+      (Math.random() * 2 - 1) * radius,
+      0,
+      (Math.random() * 2 - 1) * radius
+    );
+    const scaleY = lerp(heightRange[0], heightRange[1], Math.random());
+    const scaleXZ = scaleY * lerp(0.8, 1.4, Math.random());
+    const pos = center.clone().add(offset);
+    const rock = addBox(
+      `${name}-${i}`,
+      new pc.Vec3(scaleXZ * 1.2, scaleY, scaleXZ),
+      new pc.Vec3(pos.x, scaleY * 0.5, pos.z),
+      makeMaterial(palette.stone, 0.05, 0.6),
+      true
+    );
+    rock.setLocalEulerAngles(0, Math.random() * 360, 0);
+  }
 }
 
 function buildHumanoid(name, position, colors) {
@@ -721,14 +763,15 @@ function buildFreeportLanding() {
   const freeportExtent = 120 * areaScale;
 
   // Ground and harbor water
-  addPlane('ground', scaleSize(new pc.Vec3(280, 1, 280)), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0, 0.9));
-  addPlane('north-fields', scaleSize(new pc.Vec3(280, 1, 140)), new pc.Vec3(0, 0.02, -220 * areaScale), makeMaterial(palette.sand, 0, 0.9));
-  const water = addPlane('harbor-water', scaleSize(new pc.Vec3(200, 1, 160)), scalePos(new pc.Vec3(120, -0.3, 80)), makeMaterial(palette.water, 0.1, 0.4));
-  water.render.castShadows = false;
+  addPlane('ground', scaleSize(new pc.Vec3(280, 1, 280)), new pc.Vec3(0, 0, 0), makeMaterial(palette.sand, 0.02, 0.82));
+  addPlane('north-fields', scaleSize(new pc.Vec3(280, 1, 140)), new pc.Vec3(0, 0.02, -220 * areaScale), makeMaterial(palette.sand, 0.02, 0.82));
+  addWaterSurface('harbor-water', scaleSize(new pc.Vec3(200, 1, 160)), scalePos(new pc.Vec3(120, -0.3, 80)), palette.water);
   addLighthouse('harbor-lighthouse', scalePos(new pc.Vec3(168, 0, -48)));
   addLantern('dock-lantern-a', scalePos(new pc.Vec3(freeportExtent + 14, 0, 46)));
   addLantern('dock-lantern-b', scalePos(new pc.Vec3(freeportExtent + 52, 0, 30)));
   addLantern('dock-lantern-c', scalePos(new pc.Vec3(freeportExtent + 24, 0, -12)));
+  addRockCluster('shore-rocks', scalePos(new pc.Vec3(freeportExtent + 80, 0, -80)), 8, 28, [1.4, 3.2]);
+  addRockCluster('bluff-rocks', scalePos(new pc.Vec3(-freeportExtent + 12, 0, 88)), 6, 26, [1.8, 3.8]);
 
   // City walls
   const wallMat = makeMaterial(palette.stone, 0, 0.7);
@@ -881,9 +924,8 @@ function buildFreeportDesert() {
   addPlane('dune-ridge', new pc.Vec3(240 * areaScale, 2.5, 30 * areaScale), new pc.Vec3(desertBase.x + 240, 1.2, desertBase.z - 80), makeMaterial(palette.desertSand, 0, 0.92));
 
   const oasisCenter = desertBase.clone().add(oasisOffset);
-  const water = addPlane('oasis-water', new pc.Vec3(60, 1, 60), new pc.Vec3(oasisCenter.x, -0.4, oasisCenter.z), makeMaterial(palette.oasisWater, 0.15, 0.2));
-  water.render.castShadows = false;
-  addPlane('oasis-grass', new pc.Vec3(80, 1, 80), new pc.Vec3(oasisCenter.x, 0.02, oasisCenter.z), makeMaterial(new pc.Color(0.32, 0.44, 0.3), 0, 0.8));
+  addWaterSurface('oasis-water', new pc.Vec3(60, 1, 60), new pc.Vec3(oasisCenter.x, -0.4, oasisCenter.z), palette.oasisWater);
+  addPlane('oasis-grass', new pc.Vec3(80, 1, 80), new pc.Vec3(oasisCenter.x, 0.02, oasisCenter.z), makeMaterial(new pc.Color(0.32, 0.44, 0.3), 0.02, 0.78));
   addCylinder('oasis-palm', 1.2, 12, new pc.Vec3(oasisCenter.x - 6, 6, oasisCenter.z + 4), makeMaterial(palette.wood, 0.05, 0.55), true);
   addCylinder('oasis-palm-2', 1, 11, new pc.Vec3(oasisCenter.x + 8, 5.5, oasisCenter.z - 3), makeMaterial(palette.wood, 0.05, 0.55), true);
   addLantern('oasis-lantern-a', new pc.Vec3(oasisCenter.x + 14, 0, oasisCenter.z + 6), 6, 20);
@@ -900,7 +942,9 @@ function buildFreeportDesert() {
     new pc.Vec3(desertBase.x + 320, 1, desertBase.z - 120),
     new pc.Vec3(desertBase.x + 520, 1, desertBase.z + 180),
   ];
-  boulders.forEach((pos, i) => addBox(`desert-boulder-${i}`, new pc.Vec3(18, 12, 14), pos, makeMaterial(palette.stone, 0, 0.65), true));
+  boulders.forEach((pos, i) => addBox(`desert-boulder-${i}`, new pc.Vec3(18, 12, 14), pos, makeMaterial(palette.stone, 0.05, 0.6), true));
+  addRockCluster('dune-rocks', new pc.Vec3(desertBase.x + 260, 0, desertBase.z + 60), 10, 44, [1.6, 3.4]);
+  addRockCluster('oasis-rim-rocks', new pc.Vec3(oasisCenter.x - 42, 0, oasisCenter.z + 30), 7, 30, [1.4, 2.8]);
 
   addDesertSkitter('Oasis Scarab', new pc.Vec3(oasisCenter.x + 12, 0.6, oasisCenter.z + 18));
   addDesertSkitter('Dune Forager', new pc.Vec3(desertBase.x + 260, 0.6, desertBase.z - 90));
@@ -2142,10 +2186,28 @@ function updateDayNight(dt) {
   mixColor(duskColor, dayColor, daylight, tmpColor);
   camera.camera.clearColor.copy(tmpColor);
 
+  mixColor(fogNightColor, fogDayColor, daylight, tmpColor);
+  app.scene.fogColor.copy(tmpColor);
+  app.scene.fogDensity = lerp(fogNightDensity, fogDayDensity, daylight);
+
   lanterns.forEach((lantern) => {
     const targetIntensity = lerp(3.1, 0, daylight);
     lantern.light.intensity = targetIntensity;
     lantern.enabled = targetIntensity > 0.05;
+  });
+}
+
+function updateWaterSurfaces(dt) {
+  waterTime += dt;
+  const surfacePulse = Math.sin(waterTime * 0.8) * 0.05 + Math.cos(waterTime * 0.35) * 0.03;
+  const daylight = clamp01(Math.sin((timeOfDay / dayDuration) * Math.PI * 2));
+  waterSurfaces.forEach((surface) => {
+    const brighten = clamp01(0.85 + daylight * 0.25 + surfacePulse * 0.2);
+    waterTint.r = surface.baseColor.r * brighten;
+    waterTint.g = surface.baseColor.g * brighten;
+    waterTint.b = surface.baseColor.b * brighten;
+    surface.material.diffuse.copy(waterTint);
+    surface.material.update();
   });
 }
 
@@ -2173,6 +2235,7 @@ function collides(position) {
 app.on('update', (dt) => {
   updateDayNight(dt);
   updateBeacons(dt);
+  updateWaterSurfaces(dt);
   pollGamepadConfirmCancel();
   if (menuOpen) {
     updateNameplatePosition();

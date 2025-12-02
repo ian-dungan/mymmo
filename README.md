@@ -1,6 +1,8 @@
 # Freeport Landing (PlayCanvas)
 A two-zone prototype inspired by EverQuest's Freeport harbor. The Freeport city footprint is ~20x larger with multiple districts, a harbor lighthouse, and lantern-lit plazas, while the connected **Freeport Desert** zone stretches east to an oasis camp with tents, palms, and roaming wildlife. A lightweight day/night cycle shifts the sun, ambient light, and lantern/beacon glow to keep the docks and desert feeling alive at different hours.
 
+Recent polish passes add tintable atmospheric fog, shimmering water surfaces, more natural sand/stone/water palettes, and rock clusters along the harbor cliffs and desert dunes so the world reads more grounded and realistic without heavy assets.
+
 Click the canvas to lock the mouse, then use **WASD + mouse look** to move; hold **Shift** (keyboard) or the gamepad triggers to sprint. Tap **Tab** (keyboard) to target whatever sits under the center of the screen; taps on mobile can also target nearby characters and crates. Gamepad sticks and on-screen touch controls are supported on desktop and mobile browsers. The HUD stays clean until you open the tabbed menu with **M** (keyboard), **X** (gamepad), or the top-right **☰ Menu** button on mobile; **B** on gamepad always cancels/clears targets and closes menus.
 
 ## Files you need
