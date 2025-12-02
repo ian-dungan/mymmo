@@ -824,7 +824,18 @@ const menuToggleBtn = document.getElementById('menuToggle');
 const menuCloseBtn = document.getElementById('menuClose');
 const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
+const hotkeyOverlay = document.getElementById('hotkeyOverlay');
+const actionMenuEl = document.getElementById('actionMenu');
+const actionButtons = [
+  document.getElementById('action-talk'),
+  document.getElementById('action-attack'),
+  document.getElementById('action-item'),
+  document.getElementById('action-check'),
+];
 let previousTabIndex = 0;
+let actionMenuOpen = false;
+let actionMenuTarget = null;
+let actionFocusIndex = 0;
 
 function equipStarterSet() {
   ['leather-tunic', 'soft-boots', 'mariner-gloves', 'rusty-cutlass', 'oak-buckler', 'sapphire-charm'].forEach((id) => {
@@ -872,9 +883,13 @@ function readGamepad() {
 
 let previousGamepadA = false;
 let previousGamepadB = false;
-let previousGamepadEast = false;
+let previousGamepadX = false;
+let previousGamepadY = false;
+let previousGamepadLB = false;
 let previousGamepadRB = false;
 let previousGamepadDpadX = 0;
+let previousGamepadDpadY = 0;
+let hotkeyOverlayTimer = null;
 
 function applyGamepadLook(dt) {
   if (menuOpen) return;
@@ -894,19 +909,59 @@ function pollGamepadConfirmCancel() {
   if (!pad || !pad.buttons || !pad.buttons.length) {
     previousGamepadA = false;
     previousGamepadB = false;
+    previousGamepadX = false;
+    previousGamepadY = false;
+    previousGamepadLB = false;
+    previousGamepadRB = false;
+    previousGamepadDpadX = 0;
+    previousGamepadDpadY = 0;
     return;
   }
 
-  const aPressed = !!(pad.buttons[0] && pad.buttons[0].pressed);
-  const bPressed = !!(pad.buttons[1] && pad.buttons[1].pressed);
+  const buttons = pad.buttons;
+  const aPressed = !!buttons[0]?.pressed;
+  const bPressed = !!buttons[1]?.pressed;
+  const xPressed = !!buttons[2]?.pressed;
+  const yPressed = !!buttons[3]?.pressed;
+  const lbPressed = !!buttons[4]?.pressed;
+  const rbPressed = !!buttons[5]?.pressed;
+  const dpadLeft = !!buttons[14]?.pressed;
+  const dpadRight = !!buttons[15]?.pressed;
+  const dpadUp = !!buttons[12]?.pressed;
+  const dpadDown = !!buttons[13]?.pressed;
+
+  const axisX = dpadRight ? 1 : dpadLeft ? -1 : 0;
+  const axisY = dpadDown ? 1 : dpadUp ? -1 : 0;
+
+  if (axisX !== 0 && previousGamepadDpadX === 0) {
+    if (actionMenuOpen) {
+      setActionFocus(axisX);
+    } else if (menuOpen) {
+      stepTab(axisX);
+    } else {
+      cycleEnemyTarget(axisX);
+    }
+  }
+
+  if (axisY !== 0 && previousGamepadDpadY === 0 && actionMenuOpen) {
+    setActionFocus(axisY);
+  }
 
   if (aPressed && !previousGamepadA) {
-    if (menuOpen) {
-      // Confirm/acknowledge while menu is open — no-op for now.
+    if (actionMenuOpen) {
+      handleActionSelection(actionButtons[actionFocusIndex]?.id.replace('action-', ''));
+    } else if (menuOpen) {
+      // Confirm within menu reserved for future use
+    } else if (selectedTarget) {
+      openActionMenu(selectedTarget);
     } else {
       const nearest = findNearestInteractable();
       if (nearest?.type === 'npc') {
-        interactWithNPC(nearest.ref);
+        const actor = actorForEntity(nearest.ref.entity);
+        if (actor) {
+          selectActor(actor);
+          openActionMenu(actor);
+        }
       } else if (nearest?.type === 'crate') {
         interactWithCrate(nearest.ref);
       } else {
@@ -916,48 +971,31 @@ function pollGamepadConfirmCancel() {
   }
 
   if (bPressed && !previousGamepadB) {
-    if (menuOpen) closeMenu();
-    clearTarget();
+    if (actionMenuOpen) closeActionMenu();
+    else if (menuOpen) closeMenu();
+    else clearTarget();
   }
+
+  if (xPressed && !previousGamepadX) {
+    closeActionMenu();
+    toggleMenu();
+  }
+
+  if (yPressed && !previousGamepadY) {
+    queuedAbility = 'slash';
+  }
+
+  if (lbPressed && !previousGamepadLB) showHotkeyOverlay('left');
+  if (rbPressed && !previousGamepadRB) showHotkeyOverlay('right');
 
   previousGamepadA = aPressed;
   previousGamepadB = bPressed;
-}
-
-function pollGamepadAttack() {
-  const pad = readGamepad();
-  if (!pad || !pad.buttons || !pad.buttons.length) {
-    previousGamepadEast = false;
-    return;
-  }
-  const east = !!(pad.buttons[2] && pad.buttons[2].pressed);
-  if (east && !previousGamepadEast) queuePrimaryAttack();
-  previousGamepadEast = east;
-}
-
-function pollGamepadTarget() {
-  const pad = readGamepad();
-  if (!pad || !pad.buttons || !pad.buttons.length) {
-    previousGamepadRB = false;
-    previousGamepadDpadX = 0;
-    return;
-  }
-
-  const left = !!(pad.buttons[14] && pad.buttons[14].pressed);
-  const right = !!(pad.buttons[15] && pad.buttons[15].pressed);
-  const axis = right ? 1 : left ? -1 : 0;
-  if (axis !== 0 && previousGamepadDpadX === 0) {
-    if (menuOpen) {
-      stepTab(axis);
-    } else {
-      cycleEnemyTarget(axis);
-    }
-  }
-  previousGamepadDpadX = axis;
-
-  const rb = !!(pad.buttons[5] && pad.buttons[5].pressed);
-  if (!menuOpen && rb && !previousGamepadRB) selectFromCrosshair();
-  previousGamepadRB = rb;
+  previousGamepadX = xPressed;
+  previousGamepadY = yPressed;
+  previousGamepadLB = lbPressed;
+  previousGamepadRB = rbPressed;
+  previousGamepadDpadX = axisX;
+  previousGamepadDpadY = axisY;
 }
 
 function readGamepadMove() {
@@ -1157,6 +1195,10 @@ tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => setTab(btn.dataset.tab));
 });
 
+actionButtons.forEach((btn) => {
+  btn.addEventListener('click', () => handleActionSelection(btn.id.replace('action-', '')));
+});
+
 inventoryContentEl.addEventListener('click', (e) => {
   const target = e.target.closest('.equip-btn');
   if (!target) return;
@@ -1189,6 +1231,7 @@ function stepTab(direction) {
 
 function openMenu() {
   if (menuOpen) return;
+  closeActionMenu();
   menuOpen = true;
   menuOverlay.classList.remove('hidden');
   menuToggleBtn.classList.add('hidden');
@@ -1210,11 +1253,48 @@ function toggleMenu() {
   else openMenu();
 }
 
+function showHotkeyOverlay(side = 'left') {
+  const label = side === 'right' ? 'Right hotkeys (RB)' : 'Left hotkeys (LB)';
+  hotkeyOverlay.textContent = `${label} coming soon.`;
+  hotkeyOverlay.classList.remove('hidden');
+  clearTimeout(hotkeyOverlayTimer);
+  hotkeyOverlayTimer = setTimeout(() => hotkeyOverlay.classList.add('hidden'), 1500);
+}
+
+function setActionFocus(indexDelta = 0) {
+  const enabledButtons = actionButtons.filter((btn) => !btn.disabled);
+  if (!enabledButtons.length) return;
+  if (indexDelta !== 0) {
+    actionFocusIndex = (actionFocusIndex + indexDelta + enabledButtons.length) % enabledButtons.length;
+  } else {
+    actionFocusIndex = 0;
+  }
+  enabledButtons[actionFocusIndex].focus({ preventScroll: true });
+}
+
+function closeActionMenu() {
+  actionMenuOpen = false;
+  actionMenuTarget = null;
+  actionMenuEl.classList.add('hidden');
+}
+
+function openActionMenu(target) {
+  if (!target) return;
+  actionMenuTarget = target;
+  actionMenuOpen = true;
+  actionMenuEl.classList.remove('hidden');
+  actionButtons[0].disabled = target.type !== 'npc';
+  actionButtons[1].disabled = false;
+  actionButtons[2].disabled = false;
+  actionButtons[3].disabled = false;
+  setActionFocus(0);
+}
+
 function renderHelpPanel() {
   helpContentEl.innerHTML = `
     <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu, <strong>Esc</strong> to cancel/clear target.</div>
-    <div><strong>Gamepad</strong>: Left stick move, Right stick look, hold triggers to sprint, <strong>A</strong> confirms (interact or opens menu), <strong>B</strong> cancels/closes menu/clears target, <strong>X</strong> attacks, <strong>RB</strong> targets under crosshair, d-pad left/right cycles enemies or tabs when a menu is open.</div>
-    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap targets or crates, <strong>Attack</strong> for combat, enlarged top menu button for panels.</div>
+    <div><strong>Gamepad</strong>: Left stick move, Right stick look, hold triggers to sprint, <strong>A</strong> opens the action submenu for the current target, <strong>B</strong> cancels/closes menus and clears targets, <strong>X</strong> toggles the main menu, <strong>Y</strong> triggers a quick attack, LB/RB pop hotkey overlays, and d-pad left/right cycles enemies or tabs (when menus are open).</div>
+    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap targets or crates to open actions, <strong>Attack</strong> for combat, enlarged top menu button for panels.</div>
     <div><strong>Menu Tabs</strong>: Use mouse/touch to click tabs, press Q/E on keyboard to cycle, or d-pad left/right on gamepad when the menu is visible.</div>
   `;
 }
@@ -1328,6 +1408,7 @@ function selectActor(actor) {
 
 function clearTarget() {
   selectedTarget = null;
+  closeActionMenu();
   updateNameplatePosition();
 }
 
@@ -1392,10 +1473,7 @@ function handlePointerSelect(clientX, clientY) {
 
   if (target.type === 'actor') {
     selectActor(target.ref);
-    if (target.ref.type === 'npc') {
-      const npc = npcForActor(target.ref);
-      if (npc) interactWithNPC(npc);
-    }
+    openActionMenu(target.ref);
   }
 
   if (target.type === 'crate') {
@@ -1409,6 +1487,49 @@ function actorForEntity(entity) {
 
 function npcForActor(actor) {
   return npcs.find((n) => n.actorId === actor.id) || null;
+}
+
+function handleActionSelection(actionKey) {
+  const target = actionMenuTarget || selectedTarget;
+  if (!target) return;
+
+  if (actionKey === 'talk') {
+    if (target.type === 'npc') {
+      const npc = npcForActor(target);
+      if (npc) interactWithNPC(npc);
+    } else {
+      showDialogue('Action', 'You can only talk to townsfolk.');
+    }
+    closeActionMenu();
+    return;
+  }
+
+  if (actionKey === 'attack') {
+    selectActor(target);
+    if (target.type === 'enemy') {
+      queuedAbility = 'slash';
+    } else if (target.type === 'npc') {
+      showDialogue('Friendly', `${target.name} is not looking for a fight.`);
+    } else {
+      showDialogue('Action', 'Find a hostile target to attack.');
+    }
+    closeActionMenu();
+    return;
+  }
+
+  if (actionKey === 'item') {
+    showDialogue(target.name || 'Target', 'Using items on targets will arrive soon.');
+    closeActionMenu();
+    return;
+  }
+
+  if (actionKey === 'check') {
+    const hpLine = target.maxHealth
+      ? `${Math.round(target.health)}/${Math.round(target.maxHealth)} HP`
+      : 'Unknown vitality';
+    showDialogue(target.name || 'Target', `Level ${target.level || '?'} · ${hpLine}`);
+    closeActionMenu();
+  }
 }
 
 function abilityKey(actor, ability) {
@@ -1721,7 +1842,6 @@ app.on('update', (dt) => {
   updateBeacons(dt);
   pollGamepadConfirmCancel();
   if (menuOpen) {
-    pollGamepadTarget();
     updateNameplatePosition();
     return;
   }
@@ -1729,8 +1849,6 @@ app.on('update', (dt) => {
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
-  pollGamepadAttack();
-  pollGamepadTarget();
   handleQueuedAbility();
 
   // build local basis
@@ -1797,13 +1915,13 @@ app.on('update', (dt) => {
 
   const nearest = findNearestInteractable();
   if (nearest?.type === 'npc') {
-    interactionHint.innerHTML = `Press <strong>E</strong> / A (confirm) / tap Interact to talk to ${nearest.ref.name}.`;
+    interactionHint.innerHTML = `Press <strong>E</strong> / A (actions) / tap Interact to open options for ${nearest.ref.name}.`;
     interactionHint.classList.remove('hidden');
     if (interactionQueued) {
       interactWithNPC(nearest.ref);
     }
   } else if (nearest?.type === 'crate') {
-    interactionHint.innerHTML = 'Press <strong>E</strong> / A (confirm) / tap Interact to secure this supply crate.';
+    interactionHint.innerHTML = 'Press <strong>E</strong> / A (actions) / tap Interact to secure this supply crate.';
     interactionHint.classList.remove('hidden');
     if (interactionQueued) interactWithCrate(nearest.ref);
   } else {

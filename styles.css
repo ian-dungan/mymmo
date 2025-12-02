@@ -314,6 +314,69 @@ canvas {
   letter-spacing: 0.3px;
 }
 
+.hotkey-overlay {
+  position: fixed;
+  left: 50%;
+  top: 22px;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  background: rgba(10, 16, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: #dbe9ff;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  z-index: 25;
+}
+
+.action-menu {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  background: rgba(6, 10, 20, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  min-width: 240px;
+  z-index: 22;
+}
+
+.action-menu-title {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  color: #f1e6c5;
+  text-align: center;
+}
+
+.action-menu-buttons {
+  display: grid;
+  gap: 6px;
+}
+
+.action-choice {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7f0ff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action-choice:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.action-choice:focus-visible {
+  outline: 2px solid rgba(126, 195, 255, 0.7);
+  outline-offset: 2px;
+}
+
 @media (max-width: 600px) {
   .menu {
     top: 56px;

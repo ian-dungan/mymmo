@@ -47,6 +47,7 @@
   </div>
 
   <div id="interactionHint" class="interaction hidden">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</div>
+  <div id="hotkeyOverlay" class="hotkey-overlay hidden">Hotkey wheel (LB/RB) coming soon.</div>
   <div id="dialogue" class="dialogue hidden">
     <div class="dialogue-name"></div>
     <div class="dialogue-text"></div>
@@ -63,6 +64,15 @@
     <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
     <button id="attack-button" class="touch-action-button attack-button" aria-label="Primary attack">Attack</button>
     <button id="interact-button" class="touch-action-button interact-button" aria-label="Interact">Interact</button>
+  </div>
+  <div id="actionMenu" class="action-menu hidden" role="dialog" aria-live="polite">
+    <div class="action-menu-title">Choose action</div>
+    <div class="action-menu-buttons">
+      <button id="action-talk" class="action-choice">Talk</button>
+      <button id="action-attack" class="action-choice">Attack</button>
+      <button id="action-item" class="action-choice">Use Item</button>
+      <button id="action-check" class="action-choice">Check</button>
+    </div>
   </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>
