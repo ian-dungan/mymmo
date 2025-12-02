@@ -12,23 +12,40 @@
   <script src="https://code.playcanvas.com/playcanvas-stable.min.js"></script>
 </head>
 <body>
-  <div class="hud">
-    <h1>Freeport Landing (Prototype)</h1>
-    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint. Tap/left-click characters to select them.</p>
-    <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
-    <p id="interactionHint" class="interaction">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</p>
-    <div id="dialogue" class="dialogue hidden">
-      <div class="dialogue-name"></div>
-      <div class="dialogue-text"></div>
+  <button id="menuToggle" class="menu-toggle" aria-label="Open menu">☰ Menu</button>
+
+  <div id="gameMenu" class="menu hidden" role="dialog" aria-modal="true" aria-label="Game menu">
+    <div class="menu-header">
+      <div class="menu-title">Freeport Landing</div>
+      <div class="tab-bar" role="tablist">
+        <button class="tab-button active" data-tab="stats" role="tab" aria-selected="true">Stats</button>
+        <button class="tab-button" data-tab="quests" role="tab" aria-selected="false">Quests</button>
+        <button class="tab-button" data-tab="help" role="tab" aria-selected="false">Help / Controls</button>
+        <button class="tab-button" data-tab="inventory" role="tab" aria-selected="false">Inventory</button>
+      </div>
+      <button id="menuClose" class="menu-close" aria-label="Close menu">×</button>
     </div>
-    <div class="card">
-      <div class="card-title">Character</div>
-      <div id="classPanel" class="card-body"></div>
+    <div class="menu-content">
+      <section id="tab-stats" class="tab-panel active" role="tabpanel">
+        <div id="classPanel" class="card-body"></div>
+        <div class="card-body subtle" id="playerPos">0,0,0</div>
+      </section>
+      <section id="tab-quests" class="tab-panel" role="tabpanel">
+        <div id="questStatus" class="card-body">No active quests. Speak to Quartermaster Ryn.</div>
+      </section>
+      <section id="tab-help" class="tab-panel" role="tabpanel">
+        <div class="card-body" id="helpContent"></div>
+      </section>
+      <section id="tab-inventory" class="tab-panel" role="tabpanel">
+        <div id="inventoryContent" class="card-body">Your satchel is light. Pick up supply crates to see loot tracked here.</div>
+      </section>
     </div>
-    <div class="card">
-      <div class="card-title">Quest Journal</div>
-      <div id="questStatus" class="card-body">No active quests. Speak to Quartermaster Ryn.</div>
-    </div>
+  </div>
+
+  <div id="interactionHint" class="interaction hidden">Walk up to someone and press <strong>E</strong> / south face / tap Interact.</div>
+  <div id="dialogue" class="dialogue hidden">
+    <div class="dialogue-name"></div>
+    <div class="dialogue-text"></div>
   </div>
   <div id="nameplate" class="nameplate hidden" aria-live="polite">
     <div class="nameplate-name"></div>

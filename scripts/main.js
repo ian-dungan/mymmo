@@ -352,6 +352,7 @@ const radToDeg = (radians) => (radians * 180) / Math.PI;
 const interactRadius = 5.5;
 let interactionQueued = false;
 let selectedTarget = null;
+let menuOpen = false;
 const screenPos = new pc.Vec3();
 const playerStats = buildPlayerStats();
 const playerActor = {
@@ -366,6 +367,9 @@ registerActor(playerActor);
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'm') {
+    toggleMenu();
+  }
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
   if (e.key.toLowerCase() === 'e') interactionQueued = true;
@@ -382,8 +386,10 @@ function readGamepad() {
 }
 
 let previousGamepadSouth = false;
+let previousGamepadY = false;
 
 function applyGamepadLook(dt) {
+  if (menuOpen) return;
   const pad = readGamepad();
   if (!pad) return;
   const lx = pad.axes[2] || 0;
@@ -404,6 +410,17 @@ function pollGamepadInteract() {
   const south = !!(pad.buttons[0] && pad.buttons[0].pressed);
   if (south && !previousGamepadSouth) interactionQueued = true;
   previousGamepadSouth = south;
+}
+
+function pollGamepadMenuToggle() {
+  const pad = readGamepad();
+  if (!pad || !pad.buttons || !pad.buttons.length) {
+    previousGamepadY = false;
+    return;
+  }
+  const yPressed = !!(pad.buttons[3] && pad.buttons[3].pressed);
+  if (yPressed && !previousGamepadY) toggleMenu();
+  previousGamepadY = yPressed;
 }
 
 function readGamepadMove() {
@@ -508,6 +525,7 @@ function getTouchMoveVector() {
 }
 
 function applyTouchLook(dt) {
+  if (menuOpen) return;
   const { delta } = touchState.look;
   if (!delta.x && !delta.y) return;
   yaw -= (delta.x / joystickRadius) * touchLookSpeed * dt * 60;
@@ -560,17 +578,81 @@ const dialogueTextEl = dialogueEl.querySelector('.dialogue-text');
 const interactButton = document.getElementById('interact-button');
 const classPanelEl = document.getElementById('classPanel');
 const questStatusEl = document.getElementById('questStatus');
+const helpContentEl = document.getElementById('helpContent');
+const inventoryContentEl = document.getElementById('inventoryContent');
 const nameplateEl = document.getElementById('nameplate');
 const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
 const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
+const menuOverlay = document.getElementById('gameMenu');
+const menuToggleBtn = document.getElementById('menuToggle');
+const menuCloseBtn = document.getElementById('menuClose');
+const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 
 interactButton.addEventListener('click', () => {
   interactionQueued = true;
 });
 
+menuToggleBtn.addEventListener('click', () => toggleMenu());
+menuCloseBtn.addEventListener('click', () => closeMenu());
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener('click', () => setTab(btn.dataset.tab));
+});
+
+function setTab(tab) {
+  tabButtons.forEach((btn) => {
+    const active = btn.dataset.tab === tab;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active);
+  });
+  tabPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `tab-${tab}`);
+  });
+}
+
+function openMenu() {
+  if (menuOpen) return;
+  menuOpen = true;
+  menuOverlay.classList.remove('hidden');
+  menuToggleBtn.classList.add('hidden');
+  interactionHint.classList.add('hidden');
+  if (document.pointerLockElement === canvas) {
+    document.exitPointerLock();
+  }
+}
+
+function closeMenu() {
+  if (!menuOpen) return;
+  menuOpen = false;
+  menuOverlay.classList.add('hidden');
+  menuToggleBtn.classList.remove('hidden');
+}
+
+function toggleMenu() {
+  if (menuOpen) closeMenu();
+  else openMenu();
+}
+
+function renderHelpPanel() {
+  helpContentEl.innerHTML = `
+    <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, M to open menu.</div>
+    <div><strong>Gamepad</strong>: Left stick move, Right stick look, South face to interact/sprint, Y to open menu.</div>
+    <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, Interact button for talking/picking up, top menu button for panels.</div>
+  `;
+}
+
+function updateInventoryPanel() {
+  if (supplyQuest.state === 'active' || supplyQuest.state === 'ready') {
+    inventoryContentEl.textContent = `Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}`;
+  } else {
+    inventoryContentEl.textContent = 'Your satchel is light. Pick up supply crates to see loot tracked here.';
+  }
+}
+
 function updateHud() {
   const p = camera.getPosition();
-  posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
+  posLabel.textContent = `Freeport · ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
 
 function renderClassPanel() {
@@ -592,6 +674,7 @@ function updateQuestStatus() {
   } else if (supplyQuest.state === 'ready') {
     questStatusEl.textContent = `${supplyQuest.name}: Return to Quartermaster Ryn for your reward.`;
   }
+  updateInventoryPanel();
 }
 
 function getHeadPosition(actor) {
@@ -746,6 +829,12 @@ function collides(position) {
 }
 
 app.on('update', (dt) => {
+  pollGamepadMenuToggle();
+  if (menuOpen) {
+    updateNameplatePosition();
+    return;
+  }
+
   // Gamepad/touch look first so we clamp after
   applyGamepadLook(dt);
   applyTouchLook(dt);
@@ -804,14 +893,16 @@ app.on('update', (dt) => {
   const nearest = findNearestInteractable();
   if (nearest?.type === 'npc') {
     interactionHint.innerHTML = `Press <strong>E</strong> / south face / tap Interact to talk to ${nearest.ref.name}.`;
+    interactionHint.classList.remove('hidden');
     if (interactionQueued) {
       interactWithNPC(nearest.ref);
     }
   } else if (nearest?.type === 'crate') {
     interactionHint.innerHTML = 'Press <strong>E</strong> / south face / tap Interact to secure this supply crate.';
+    interactionHint.classList.remove('hidden');
     if (interactionQueued) interactWithCrate(nearest.ref);
   } else {
-    interactionHint.innerHTML = 'Walk up to someone and press <strong>E</strong> / south face / tap Interact.';
+    interactionHint.classList.add('hidden');
   }
   interactionQueued = false;
   updateHud();
@@ -819,6 +910,8 @@ app.on('update', (dt) => {
 });
 
 renderClassPanel();
+renderHelpPanel();
 updateQuestStatus();
+setTab('stats');
 updateHud();
 app.start();
