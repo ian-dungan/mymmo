@@ -14,8 +14,12 @@
 <body>
   <div class="hud">
     <h1>Freeport Landing (Prototype)</h1>
-    <p>Click the canvas to lock the mouse. Use WASD + mouse to walk. Shift to sprint.</p>
+    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
     <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+  </div>
+  <div class="touch-ui">
+    <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
   </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>

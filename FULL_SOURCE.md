@@ -1,7 +1,8 @@
-# Freeport Landing Prototype: Full Source
+# Full Source Listings
 
-This document lists the complete contents of all key files in the prototype so you can copy/paste or verify your local checkout.
+Copy-paste these into fresh files to restore the working prototype.
 
+---
 ## index.html
 ```html
 <!DOCTYPE html>
@@ -20,16 +21,20 @@ This document lists the complete contents of all key files in the prototype so y
 <body>
   <div class="hud">
     <h1>Freeport Landing (Prototype)</h1>
-    <p>Click the canvas to lock the mouse. Use WASD + mouse to walk. Shift to sprint.</p>
+    <p>Click the canvas to lock the mouse. Use WASD + mouse, a gamepad, or touch controls to move. Shift/RB/south button to sprint.</p>
     <p class="stats">Zone: Freeport · Position <span id="playerPos">0,0,0</span></p>
+  </div>
+  <div class="touch-ui">
+    <div id="move-joystick" class="joystick"><div class="joystick-handle"></div></div>
+    <div id="look-joystick" class="joystick"><div class="joystick-handle"></div></div>
   </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>
 </body>
 </html>
-
 ```
 
+---
 ## styles.css
 ```css
 * {
@@ -80,14 +85,53 @@ canvas {
   font-size: 13px;
 }
 
+.touch-ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.joystick {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#move-joystick {
+  left: 20px;
+  bottom: 20px;
+}
+
+#look-joystick {
+  right: 20px;
+  bottom: 20px;
+}
+
+.joystick-handle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 @media (max-width: 600px) {
   .hud {
     max-width: calc(100vw - 32px);
   }
 }
-
 ```
 
+---
 ## scripts/main.js
 ```javascript
 if (typeof window.pc === 'undefined') {
@@ -153,33 +197,47 @@ const palette = {
 };
 
 // Helpers for spawning primitives
-function addBox(name, size, position, material) {
+const colliders = [];
+
+function registerBoxCollider(position, size, padding = 0.6) {
+  colliders.push({
+    center: position.clone(),
+    halfExtents: new pc.Vec3(size.x * 0.5, size.y * 0.5, size.z * 0.5),
+    padding,
+  });
+}
+
+function addBox(name, size, position, material, withCollider = false) {
   const entity = new pc.Entity(name);
   entity.addComponent('render', { type: 'box' });
   entity.setLocalScale(size.x, size.y, size.z);
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.render.material = material;
   app.root.addChild(entity);
+  if (withCollider) registerBoxCollider(position, size);
   return entity;
 }
 
-function addCylinder(name, radius, height, position, material) {
+function addCylinder(name, radius, height, position, material, withCollider = false) {
   const entity = new pc.Entity(name);
   entity.addComponent('render', { type: 'cylinder' });
   entity.setLocalScale(radius, height, radius);
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.render.material = material;
   app.root.addChild(entity);
+  if (withCollider)
+    registerBoxCollider(position, new pc.Vec3(radius * 2, height, radius * 2), 0.4);
   return entity;
 }
 
-function addPlane(name, size, position, material) {
+function addPlane(name, size, position, material, withCollider = false) {
   const entity = new pc.Entity(name);
   entity.addComponent('render', { type: 'plane' });
   entity.setLocalScale(size.x, 1, size.z);
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.render.material = material;
   app.root.addChild(entity);
+  if (withCollider) registerBoxCollider(position, size, 0.2);
   return entity;
 }
 
@@ -195,24 +253,24 @@ function buildFreeportLanding() {
   const wallHeight = 12;
   const wallThickness = 4;
   const extent = 120;
-  addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat);
-  addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat);
-  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat);
+  addBox('north-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, -extent), wallMat, true);
+  addBox('south-wall', new pc.Vec3(extent * 2, wallHeight, wallThickness), new pc.Vec3(0, wallHeight / 2, extent), wallMat, true);
+  addBox('west-wall', new pc.Vec3(wallThickness, wallHeight, extent * 2), new pc.Vec3(-extent, wallHeight / 2, 0), wallMat, true);
 
   // Gate and watchtowers facing the harbor
-  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10), wallMat);
-  addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6));
-  addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6));
+  addBox('gate', new pc.Vec3(18, wallHeight * 0.75, wallThickness), new pc.Vec3(extent, wallHeight * 0.75 * 0.5, 10), wallMat, true);
+  addCylinder('north-tower', 6, 18, new pc.Vec3(extent - 8, 9, -extent + 8), makeMaterial(palette.plaster, 0, 0.6), true);
+  addCylinder('south-tower', 6, 18, new pc.Vec3(extent - 8, 9, extent - 8), makeMaterial(palette.plaster, 0, 0.6), true);
 
   // Docks and pier
   const dockMat = makeMaterial(palette.wood, 0.05, 0.65);
-  addBox('main-dock', new pc.Vec3(60, 1.2, 12), new pc.Vec3(extent + 24, 0.6, 24), dockMat);
-  addBox('pier-a', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 40, 0.5, 44), dockMat);
-  addBox('pier-b', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 8, 0.5, 44), dockMat);
+  addBox('main-dock', new pc.Vec3(60, 1.2, 12), new pc.Vec3(extent + 24, 0.6, 24), dockMat, true);
+  addBox('pier-a', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 40, 0.5, 44), dockMat, true);
+  addBox('pier-b', new pc.Vec3(10, 1, 40), new pc.Vec3(extent + 8, 0.5, 44), dockMat, true);
 
   // Central plaza
   addPlane('plaza', new pc.Vec3(80, 1, 80), new pc.Vec3(-20, 0.05, 10), makeMaterial(palette.plaster, 0, 0.95));
-  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(-20, 5, 10), makeMaterial(palette.roof, 0.15, 0.4));
+  addCylinder('plaza-statue', 3.4, 10, new pc.Vec3(-20, 5, 10), makeMaterial(palette.roof, 0.15, 0.4), true);
 
   // Inns and market stalls
   const houseMat = makeMaterial(palette.plaster, 0, 0.82);
@@ -224,15 +282,15 @@ function buildFreeportLanding() {
     { pos: new pc.Vec3(30, 3, 30), size: new pc.Vec3(22, 7, 16) },
   ];
   homes.forEach((home, i) => {
-    const base = addBox(`home-${i}`, home.size, home.pos, houseMat);
+    const base = addBox(`home-${i}`, home.size, home.pos, houseMat, true);
     addBox(`home-${i}-roof`, new pc.Vec3(home.size.x * 1.05, home.size.y * 0.3, home.size.z * 1.05), new pc.Vec3(home.pos.x, home.pos.y + home.size.y * 0.6, home.pos.z), roofMat);
     base.render.castShadows = true;
   });
 
   // Hall and barracks near the gate
-  addBox('hall', new pc.Vec3(32, 10, 18), new pc.Vec3(60, 5, -20), houseMat);
+  addBox('hall', new pc.Vec3(32, 10, 18), new pc.Vec3(60, 5, -20), houseMat, true);
   addBox('hall-roof', new pc.Vec3(34, 3, 20), new pc.Vec3(60, 11.5, -20), roofMat);
-  addBox('barracks', new pc.Vec3(28, 8, 14), new pc.Vec3(40, 4, 24), houseMat);
+  addBox('barracks', new pc.Vec3(28, 8, 14), new pc.Vec3(40, 4, 24), houseMat, true);
   addBox('barracks-roof', new pc.Vec3(30, 2.5, 16), new pc.Vec3(40, 9, 24), roofMat);
 
   // Pathways
@@ -248,6 +306,8 @@ buildFreeportLanding();
 const moveSpeed = 10;
 const sprintMultiplier = 1.8;
 const rotSpeed = 0.0022;
+const gamepadLookSpeed = 2.4;
+const touchLookSpeed = 1.4;
 let yaw = Math.PI / 2; // face toward the city from the west gate
 let pitch = -0.1;
 const velocity = new pc.Vec3();
@@ -263,6 +323,132 @@ window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
 });
+
+// Gamepad state
+function readGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  return pads && pads.length ? pads[0] : null;
+}
+
+function applyGamepadLook(dt) {
+  const pad = readGamepad();
+  if (!pad) return;
+  const lx = pad.axes[2] || 0;
+  const ly = pad.axes[3] || 0;
+  const dead = 0.15;
+  const lookX = Math.abs(lx) > dead ? lx : 0;
+  const lookY = Math.abs(ly) > dead ? ly : 0;
+  yaw -= lookX * gamepadLookSpeed * dt;
+  pitch -= lookY * gamepadLookSpeed * dt;
+}
+
+function readGamepadMove() {
+  const pad = readGamepad();
+  if (!pad) return { x: 0, y: 0, sprint: false };
+  const dx = pad.axes[0] || 0;
+  const dy = pad.axes[1] || 0;
+  const dead = 0.15;
+  const x = Math.abs(dx) > dead ? dx : 0;
+  const y = Math.abs(dy) > dead ? dy : 0;
+  const sprint = (pad.buttons[5] && pad.buttons[5].pressed) || (pad.buttons[0] && pad.buttons[0].pressed);
+  return { x, y, sprint };
+}
+
+// Touch joysticks
+const moveStickEl = document.getElementById('move-joystick');
+const lookStickEl = document.getElementById('look-joystick');
+const joystickRadius = 50;
+const touchState = {
+  move: { id: null, start: null, delta: { x: 0, y: 0 } },
+  look: { id: null, start: null, delta: { x: 0, y: 0 } },
+};
+
+function resetStick(type) {
+  touchState[type].id = null;
+  touchState[type].start = null;
+  touchState[type].delta = { x: 0, y: 0 };
+  const handle = (type === 'move' ? moveStickEl : lookStickEl).querySelector('.joystick-handle');
+  handle.style.transform = 'translate(-50%, -50%)';
+}
+
+function updateStickVisual(type) {
+  const handle = (type === 'move' ? moveStickEl : lookStickEl).querySelector('.joystick-handle');
+  const { delta } = touchState[type];
+  handle.style.transform = `translate(calc(-50% + ${delta.x}px), calc(-50% + ${delta.y}px))`;
+}
+
+function clampStick(delta) {
+  const mag = Math.sqrt(delta.x * delta.x + delta.y * delta.y);
+  if (mag > joystickRadius) {
+    const scale = joystickRadius / mag;
+    delta.x *= scale;
+    delta.y *= scale;
+  }
+}
+
+function handleTouchStart(e) {
+  for (const touch of e.changedTouches) {
+    const isLeft = touch.clientX < window.innerWidth / 2;
+    const type = isLeft ? 'move' : 'look';
+    if (touchState[type].id !== null) continue;
+    touchState[type].id = touch.identifier;
+    touchState[type].start = { x: touch.clientX, y: touch.clientY };
+  }
+}
+
+function handleTouchMove(e) {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchState.move.id) {
+      const delta = {
+        x: touch.clientX - touchState.move.start.x,
+        y: touch.clientY - touchState.move.start.y,
+      };
+      clampStick(delta);
+      touchState.move.delta = delta;
+      updateStickVisual('move');
+    }
+    if (touch.identifier === touchState.look.id) {
+      const delta = {
+        x: touch.clientX - touchState.look.start.x,
+        y: touch.clientY - touchState.look.start.y,
+      };
+      clampStick(delta);
+      touchState.look.delta = delta;
+      updateStickVisual('look');
+    }
+  }
+  e.preventDefault();
+}
+
+function handleTouchEnd(e) {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchState.move.id) resetStick('move');
+    if (touch.identifier === touchState.look.id) resetStick('look');
+  }
+}
+
+['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((evt) => {
+  document.addEventListener(evt, (e) => {
+    if (evt === 'touchstart') handleTouchStart(e);
+    else if (evt === 'touchmove') handleTouchMove(e);
+    else handleTouchEnd(e);
+  }, { passive: false });
+});
+
+function getTouchMoveVector() {
+  const { delta } = touchState.move;
+  return {
+    x: delta.x / joystickRadius,
+    y: -delta.y / joystickRadius,
+  };
+}
+
+function applyTouchLook(dt) {
+  const { delta } = touchState.look;
+  if (!delta.x && !delta.y) return;
+  yaw -= (delta.x / joystickRadius) * touchLookSpeed * dt * 60;
+  pitch -= (delta.y / joystickRadius) * touchLookSpeed * dt * 60;
+}
 
 // Pointer lock for mouselook
 canvas.addEventListener('click', () => {
@@ -283,7 +469,7 @@ app.mouse.on(pc.EVENT_MOUSEMOVE, (e) => {
   pitch = pc.math.clamp(pitch, -1.2, 1.2);
 });
 
-camera.setLocalPosition(-120, 5.5, 0);
+camera.setLocalPosition(10, 5.5, 0);
 camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
 
 // UI helpers
@@ -293,7 +479,22 @@ function updateHud() {
   posLabel.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
 }
 
+function collides(position) {
+  for (const collider of colliders) {
+    const dx = Math.abs(position.x - collider.center.x);
+    const dz = Math.abs(position.z - collider.center.z);
+    const hx = collider.halfExtents.x + collider.padding;
+    const hz = collider.halfExtents.z + collider.padding;
+    if (dx <= hx && dz <= hz) return true;
+  }
+  return false;
+}
+
 app.on('update', (dt) => {
+  // Gamepad/touch look first so we clamp after
+  applyGamepadLook(dt);
+  applyTouchLook(dt);
+
   // build local basis
   const forward = camera.forward.clone();
   forward.y = 0;
@@ -302,23 +503,50 @@ app.on('update', (dt) => {
   right.y = 0;
   right.normalize();
 
+  const gamepadMove = readGamepadMove();
+  const touchMove = getTouchMoveVector();
+
   direction.set(0, 0, 0);
   if (keys.w) direction.add(forward);
   if (keys.s) direction.sub(forward);
   if (keys.a) direction.sub(right);
   if (keys.d) direction.add(right);
+
+  if (gamepadMove.x || gamepadMove.y) {
+    direction.add(right.clone().scale(gamepadMove.x));
+    direction.add(forward.clone().scale(-gamepadMove.y));
+  }
+
+  if (touchMove.x || touchMove.y) {
+    direction.add(right.clone().scale(touchMove.x));
+    direction.add(forward.clone().scale(touchMove.y));
+  }
+
   if (direction.lengthSq() > 0) direction.normalize();
 
-  const speed = keys.shift ? moveSpeed * sprintMultiplier : moveSpeed;
+  const sprintKey = keys.shift || gamepadMove.sprint;
+  const speed = sprintKey ? moveSpeed * sprintMultiplier : moveSpeed;
   velocity.copy(direction).scale(speed * dt);
 
-  camera.translate(velocity);
+  const current = camera.getPosition();
+  const next = current.clone().add(velocity);
+  let finalPos = current.clone();
+
+  const stepX = current.clone();
+  stepX.x = next.x;
+  if (!collides(stepX)) finalPos.x = next.x;
+
+  const stepZ = current.clone();
+  stepZ.z = next.z;
+  if (!collides(stepZ)) finalPos.z = next.z;
+
+  camera.setLocalPosition(finalPos);
+
+  pitch = pc.math.clamp(pitch, -1.2, 1.2);
   camera.setLocalEulerAngles(radToDeg(pitch), radToDeg(yaw), 0);
   updateHud();
 });
 
 updateHud();
 app.start();
-
 ```
-
