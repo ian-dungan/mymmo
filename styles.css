@@ -377,6 +377,134 @@ canvas {
   outline-offset: 2px;
 }
 
+.currency-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-weight: 700;
+  color: #f1e6c5;
+}
+
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.bag-slot {
+  min-height: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bag-slot.empty {
+  opacity: 0.4;
+  color: #b5bdc6;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+}
+
+.bag-item-name {
+  font-weight: 800;
+  color: #f1e6c5;
+}
+
+.bag-item-slot {
+  font-size: 12px;
+  color: #a8b5c5;
+}
+
+.bag-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bag-btn {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e7f0ff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bag-btn.sell {
+  background: rgba(196, 96, 64, 0.2);
+  border-color: rgba(196, 96, 64, 0.4);
+}
+
+.bag-btn.equip {
+  background: rgba(126, 195, 255, 0.1);
+  border-color: rgba(126, 195, 255, 0.35);
+}
+
+.bag-btn:focus-visible {
+  outline: 2px solid rgba(126, 195, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.vendor {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(8, 12, 22, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 14px;
+  width: min(1100px, 96vw);
+  z-index: 30;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+.vendor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.vendor-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f1e6c5;
+}
+
+.vendor-currency {
+  color: #dbe9ff;
+  font-weight: 700;
+}
+
+.vendor-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.vendor-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.vendor-subtitle {
+  font-weight: 800;
+  color: #a8b5c5;
+  margin-bottom: 8px;
+}
+
 @media (max-width: 600px) {
   .menu {
     top: 56px;

@@ -74,6 +74,24 @@
       <button id="action-check" class="action-choice">Check</button>
     </div>
   </div>
+
+  <div id="vendorPanel" class="vendor hidden" role="dialog" aria-modal="true" aria-label="Merchant window">
+    <div class="vendor-header">
+      <div class="vendor-title">Merchant</div>
+      <div class="vendor-currency">Your coin: <span class="currency-value" id="currencyDisplay">0g 0s 0c</span></div>
+      <button id="vendorClose" class="menu-close" aria-label="Close vendor">×</button>
+    </div>
+    <div class="vendor-columns">
+      <div class="vendor-section">
+        <div class="vendor-subtitle">Your bags</div>
+        <div id="vendorPlayerItems" class="bag-grid"></div>
+      </div>
+      <div class="vendor-section">
+        <div class="vendor-subtitle">Merchant stock</div>
+        <div id="vendorStock" class="bag-grid"></div>
+      </div>
+    </div>
+  </div>
   <canvas id="application-canvas"></canvas>
   <script src="scripts/main.js"></script>
 </body>

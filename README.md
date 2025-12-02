@@ -23,6 +23,11 @@ Open `index.html` in a modern browser (or serve the folder with any static serve
 - The sample character is a level 8 Ranger with classic EverQuest-style attributes (STR/STA/AGI/DEX/INT/WIS/CHA) plus HP, Mana, and AC.
 - The tabbed menu (M / A / ☰) holds **Stats**, **Quests**, **Equipment**, **Inventory**, and **Help/Controls**. Equip items from the Inventory tab to move them into your worn gear and update your stats instantly; **B** closes the menu on gamepad.
 
+### Bags, loot, and vendors (WoW-style)
+- Bags now mirror WoW-style backpack play: 28 slots render as a grid with empty slots visible. Loot from crates, bats, and desert skitters lands in your bags automatically as long as you have room.
+- Currency tracks gold/silver/copper; selling to or buying from vendors updates your coin total. Merchant Selene near the Freeport docks buys your goods at a silver rate and sells starter gear, spices, and bags.
+- Open the action submenu on a vendor (A on gamepad, click/tap) and pick **Talk** or **Use Item** to open the merchant window. Sell or equip directly from the merchant panel; buy items from the stock column, then equip them in the menu like WoW.
+
 ## Git remote
 This workspace is configured with the GitHub remote:
 

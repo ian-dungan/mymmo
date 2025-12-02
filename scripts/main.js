@@ -116,58 +116,174 @@ const equipmentSlots = {
   charm: null,
 };
 
-const inventory = [
-  {
+const bagCapacity = 28; // WoW-like backpack sizing for early game
+const inventory = [];
+let itemInstanceCounter = 0;
+
+function instantiateItem(template, overrides = {}) {
+  return {
+    ...template,
+    ...overrides,
+    instanceId: `itm-${++itemInstanceCounter}`,
+  };
+}
+
+function addToInventory(template, overrides = {}) {
+  if (inventory.length >= bagCapacity) {
+    showDialogue('Bags are full', 'Free up space or sell to a merchant before picking up more.');
+    return null;
+  }
+  const instance = instantiateItem(template, overrides);
+  inventory.push(instance);
+  updateInventoryPanel();
+  return instance;
+}
+
+const itemTemplates = {
+  'rusty-cutlass': {
     id: 'rusty-cutlass',
     name: 'Rusty Cutlass',
     slot: 'mainhand',
     stats: { STR: 2, DEX: 1 },
     damage: '7-12',
     note: 'Well-worn blade suited for dock skirmishes.',
+    value: 85,
   },
-  {
+  'oak-buckler': {
     id: 'oak-buckler',
     name: 'Oak Buckler',
     slot: 'offhand',
     stats: { AC: 8, STA: 1 },
     note: 'Light shield carved by Freeport carpenters.',
+    value: 60,
   },
-  {
+  'leather-tunic': {
     id: 'leather-tunic',
     name: 'Ranger Leather Tunic',
     slot: 'chest',
     stats: { AC: 12, STA: 3, AGI: 1 },
     note: 'Comfortable travelwear common among scouts.',
+    value: 95,
   },
-  {
+  'soft-boots': {
     id: 'soft-boots',
     name: 'Soft Leather Boots',
     slot: 'feet',
     stats: { AGI: 2, DEX: 1 },
     note: 'Quiet soles ideal for stalking prey.',
+    value: 55,
   },
-  {
+  'mariner-gloves': {
     id: 'mariner-gloves',
     name: 'Mariner Gloves',
     slot: 'hands',
     stats: { STR: 1, DEX: 2 },
     note: 'Salt-cured gloves favored on the docks.',
+    value: 65,
   },
-  {
+  'scout-cap': {
     id: 'scout-cap',
     name: 'Scout Cap',
     slot: 'head',
     stats: { AC: 6, AGI: 1 },
     note: 'A stitched leather cap worn by scouts.',
+    value: 45,
   },
-  {
+  'sapphire-charm': {
     id: 'sapphire-charm',
     name: 'Sapphire Charm',
     slot: 'charm',
     stats: { CHA: 3, WIS: 2, Mana: 12 },
     note: 'A calming trinket from distant merchants.',
+    value: 120,
   },
-];
+  'dock-rations': {
+    id: 'dock-rations',
+    name: 'Dock Rations',
+    slot: null,
+    stats: {},
+    note: 'Hearty dried meats and bread. Sellable to merchants.',
+    value: 30,
+  },
+  'desert-spices': {
+    id: 'desert-spices',
+    name: 'Desert Caravan Spices',
+    slot: null,
+    stats: {},
+    note: 'Rare spice pouch from the oasis caravans.',
+    value: 150,
+  },
+  'linen-satchel': {
+    id: 'linen-satchel',
+    name: 'Linen Satchel',
+    slot: null,
+    stats: {},
+    note: 'A tidy 6-slot bag you can carry or sell.',
+    value: 90,
+  },
+  'harbor-ring': {
+    id: 'harbor-ring',
+    name: 'Harbor Signet Ring',
+    slot: 'hands',
+    stats: { CHA: 2, STA: 1 },
+    note: 'Marks you as a friend of Freeport merchants.',
+    value: 110,
+  },
+};
+
+const starterInventory = [
+  'leather-tunic',
+  'soft-boots',
+  'mariner-gloves',
+  'rusty-cutlass',
+  'oak-buckler',
+  'sapphire-charm',
+  'scout-cap',
+].map((id) => itemTemplates[id]);
+
+function seedInventory() {
+  starterInventory.forEach((item) => addToInventory(item));
+}
+
+let currency = { gold: 0, silver: 75, copper: 25 };
+
+function copperTotal() {
+  return currency.gold * 10000 + currency.silver * 100 + currency.copper;
+}
+
+function setCurrencyFromCopper(total) {
+  const gold = Math.floor(total / 10000);
+  const silver = Math.floor((total % 10000) / 100);
+  const copper = total % 100;
+  currency = { gold, silver, copper };
+}
+
+function adjustCurrency(delta) {
+  const total = Math.max(0, copperTotal() + delta);
+  setCurrencyFromCopper(total);
+  renderCurrency();
+  updateInventoryPanel();
+  renderVendorPanel();
+}
+
+function formatCurrency(cur = currency) {
+  return `${cur.gold}g ${cur.silver}s ${cur.copper}c`;
+}
+
+function formatValueCopper(amount) {
+  const gold = Math.floor(amount / 10000);
+  const silver = Math.floor((amount % 10000) / 100);
+  const copper = amount % 100;
+  const parts = [];
+  if (gold) parts.push(`${gold}g`);
+  if (silver || gold) parts.push(`${silver}s`);
+  parts.push(`${copper}c`);
+  return parts.join(' ');
+}
+
+function renderCurrency() {
+  if (currencyDisplayEl) currencyDisplayEl.textContent = formatCurrency();
+}
 
 const playerProfile = {
   name: 'Adventurer',
@@ -259,6 +375,15 @@ const supplyQuest = {
   reward: '2s + harbor favor',
 };
 
+function grantLoot(templateId, source = 'Loot') {
+  const template = itemTemplates[templateId];
+  if (!template) return;
+  const added = addToInventory(template);
+  if (added) {
+    showDialogue(source, `You receive ${template.name}.`);
+  }
+}
+
 function resetCrateAppearance() {
   questCrates.forEach((c) => {
     c.collected = false;
@@ -266,13 +391,20 @@ function resetCrateAppearance() {
   });
 }
 
+function unequip(slot) {
+  const equipped = equipmentSlots[slot];
+  if (!equipped) return;
+  addToInventory(equipped);
+  equipmentSlots[slot] = null;
+}
+
 function equipItem(item) {
   if (!item || !item.slot) return;
   const previous = equipmentSlots[item.slot];
   equipmentSlots[item.slot] = item;
-  const index = inventory.findIndex((i) => i.id === item.id);
+  const index = inventory.findIndex((i) => i.instanceId === item.instanceId);
   if (index !== -1) inventory.splice(index, 1);
-  if (previous) inventory.push(previous);
+  if (previous) addToInventory(previous);
   syncVitalsToGear();
 }
 
@@ -691,7 +823,7 @@ function buildFreeportLanding() {
       'The Freeport docks run on crates and coin. Want work? I pay for secured cargo.',
       'Claim three marked supply crates and you will have my thanks and silver.',
     ],
-    { offersQuest: true }
+    { questGiver: true }
   );
   addNPC('Archivist Rella', scalePos(new pc.Vec3(-10, 0, 32)), { torso: palette.noble, legs: palette.cloth, skin: new pc.Color(0.78, 0.66, 0.62) }, [
     'Our maps are rough sketches—the desert east of here is undercharted.',
@@ -701,6 +833,22 @@ function buildFreeportLanding() {
     'Stay clear of troublemaker alleys—my patrol covers the plaza.',
     'If you spot loose crates, report back to Quartermaster Ryn.',
   ], { health: 180 });
+  addNPC(
+    'Merchant Selene',
+    scalePos(new pc.Vec3(26, 0, 20)),
+    { torso: palette.sailor, legs: palette.plaster, skin: new pc.Color(0.88, 0.76, 0.66) },
+    [
+      'Fresh gear from Freeport ships—bags, bucklers, and trinkets.',
+      'If your packs are full, I pay silver for clean goods.',
+    ],
+    {
+      vendor: {
+        stock: ['harbor-ring', 'linen-satchel', 'dock-rations', 'desert-spices'],
+        sellMultiplier: 0.35,
+        buyMultiplier: 1.05,
+      },
+    }
+  );
 
   addQuestCrate('Supply Crate A', scalePos(new pc.Vec3(70, 0, -6)));
   addQuestCrate('Supply Crate B', scalePos(new pc.Vec3(94, 0, 34)));
@@ -815,6 +963,7 @@ const questStatusEl = document.getElementById('questStatus');
 const helpContentEl = document.getElementById('helpContent');
 const inventoryContentEl = document.getElementById('inventoryContent');
 const equipmentContentEl = document.getElementById('equipmentContent');
+const currencyDisplayEl = document.getElementById('currencyDisplay');
 const nameplateEl = document.getElementById('nameplate');
 const nameplateNameEl = nameplateEl.querySelector('.nameplate-name');
 const nameplateHealthBar = nameplateEl.querySelector('.health-bar');
@@ -832,10 +981,16 @@ const actionButtons = [
   document.getElementById('action-item'),
   document.getElementById('action-check'),
 ];
+const vendorPanel = document.getElementById('vendorPanel');
+const vendorStockEl = document.getElementById('vendorStock');
+const vendorPlayerItemsEl = document.getElementById('vendorPlayerItems');
+const vendorCloseBtn = document.getElementById('vendorClose');
 let previousTabIndex = 0;
 let actionMenuOpen = false;
 let actionMenuTarget = null;
 let actionFocusIndex = 0;
+let vendorOpen = false;
+let activeVendor = null;
 
 function equipStarterSet() {
   ['leather-tunic', 'soft-boots', 'mariner-gloves', 'rusty-cutlass', 'oak-buckler', 'sapphire-charm'].forEach((id) => {
@@ -844,8 +999,10 @@ function equipStarterSet() {
   });
 }
 
+seedInventory();
 equipStarterSet();
 syncVitalsToGear();
+renderCurrency();
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 window.addEventListener('keydown', (e) => {
@@ -864,7 +1021,8 @@ window.addEventListener('keydown', (e) => {
     selectFromCrosshair();
   }
   if (e.key === 'Escape') {
-    if (menuOpen) closeMenu();
+    if (vendorOpen) closeVendor();
+    else if (menuOpen) closeMenu();
     else clearTarget();
   }
   if (e.key === '1') queuePrimaryAttack();
@@ -971,7 +1129,8 @@ function pollGamepadConfirmCancel() {
   }
 
   if (bPressed && !previousGamepadB) {
-    if (actionMenuOpen) closeActionMenu();
+    if (vendorOpen) closeVendor();
+    else if (actionMenuOpen) closeActionMenu();
     else if (menuOpen) closeMenu();
     else clearTarget();
   }
@@ -1199,15 +1358,50 @@ actionButtons.forEach((btn) => {
   btn.addEventListener('click', () => handleActionSelection(btn.id.replace('action-', '')));
 });
 
-inventoryContentEl.addEventListener('click', (e) => {
-  const target = e.target.closest('.equip-btn');
-  if (!target) return;
-  const itemId = target.dataset.item;
-  const item = inventory.find((i) => i.id === itemId);
-  if (item) {
+vendorCloseBtn.addEventListener('click', () => closeVendor());
+vendorCloseBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  closeVendor();
+});
+vendorStockEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-stock]');
+  if (!btn) return;
+  const id = btn.dataset.stock;
+  buyItemFromVendor(id);
+});
+vendorPlayerItemsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.bag-btn');
+  if (!btn) return;
+  const instanceId = btn.dataset.instance;
+  const action = btn.dataset.action;
+  const item = inventory.find((i) => i.instanceId === instanceId);
+  if (!item) return;
+  if (action === 'sell') sellItemToVendor(item, activeVendor);
+  if (action === 'equip') {
     equipItem(item);
     renderEquipmentPanel();
     updateInventoryPanel();
+    renderVendorPanel();
+  }
+});
+
+inventoryContentEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.bag-btn');
+  if (!btn) return;
+  const instanceId = btn.dataset.instance;
+  const action = btn.dataset.action;
+  const item = inventory.find((i) => i.instanceId === instanceId);
+  if (!item) return;
+
+  if (action === 'equip') {
+    equipItem(item);
+    renderEquipmentPanel();
+    updateInventoryPanel();
+    renderVendorPanel();
+  }
+
+  if (action === 'sell' && activeVendor) {
+    sellItemToVendor(item, activeVendor);
   }
 });
 
@@ -1232,6 +1426,7 @@ function stepTab(direction) {
 function openMenu() {
   if (menuOpen) return;
   closeActionMenu();
+  if (vendorOpen) closeVendor();
   menuOpen = true;
   menuOverlay.classList.remove('hidden');
   menuToggleBtn.classList.add('hidden');
@@ -1295,6 +1490,7 @@ function renderHelpPanel() {
     <div><strong>Keyboard</strong>: WASD to move, Mouse to look, Shift to sprint, E to interact, <strong>Tab</strong> to target at crosshair, <strong>1</strong> for melee, <strong>2</strong> for magic, M to open menu, <strong>Esc</strong> to cancel/clear target.</div>
     <div><strong>Gamepad</strong>: Left stick move, Right stick look, hold triggers to sprint, <strong>A</strong> opens the action submenu for the current target, <strong>B</strong> cancels/closes menus and clears targets, <strong>X</strong> toggles the main menu, <strong>Y</strong> triggers a quick attack, LB/RB pop hotkey overlays, and d-pad left/right cycles enemies or tabs (when menus are open).</div>
     <div><strong>Mobile</strong>: Left joystick to move, right joystick to look, tap targets or crates to open actions, <strong>Attack</strong> for combat, enlarged top menu button for panels.</div>
+    <div><strong>Vendors</strong>: Talk to Merchant Selene (or any vendor-tagged NPC) then use Buy/Sell buttons. Your coin total mirrors WoW-style gold/silver/copper and updates as you trade or loot.</div>
     <div><strong>Menu Tabs</strong>: Use mouse/touch to click tabs, press Q/E on keyboard to cycle, or d-pad left/right on gamepad when the menu is visible.</div>
   `;
 }
@@ -1321,25 +1517,134 @@ function updateInventoryPanel() {
       ? `<div class="card-body subtle">Supply crates secured: ${supplyQuest.progress}/${supplyQuest.required}</div>`
       : `<div class="card-body subtle">Pick up marked crates around the docks to fill this quest.</div>`;
 
-  const bag = inventory
-    .map((item) => {
-      const equipLabel = item.slot ? `<button class="equip-btn" data-item="${item.id}">Equip to ${item.slot}</button>` : '';
-      return `
-        <li>
-          <div class="item-line"><strong>${item.name}</strong> <span class="subtle">${item.slot || 'Consumable'}</span></div>
-          <div class="subtle">${item.note || ''}</div>
-          <div class="statline">${statLine(item.stats)}</div>
-          ${equipLabel}
-        </li>
-      `;
-    })
-    .join('');
+  const slots = [];
+  for (let i = 0; i < bagCapacity; i++) {
+    const item = inventory[i];
+    if (item) {
+      const equipButton = item.slot
+        ? `<button class="bag-btn equip" data-action="equip" data-instance="${item.instanceId}">Equip</button>`
+        : '';
+      const sellButton = vendorOpen && activeVendor
+        ? `<button class="bag-btn sell" data-action="sell" data-instance="${item.instanceId}">Sell (${formatValueCopper(
+            Math.max(5, Math.floor((item.value || 10) * (activeVendor.vendor?.sellMultiplier || 0.25)))
+          )})</button>`
+        : '';
+      slots.push(`
+        <div class="bag-slot">
+          <div>
+            <div class="bag-item-name">${item.name}</div>
+            <div class="bag-item-slot">${item.slot ? `Equip: ${item.slot}` : 'Carry/Use'} · ${formatValueCopper(item.value || 0)}</div>
+            <div class="subtle">${item.note || ''}</div>
+            <div class="statline">${statLine(item.stats)}</div>
+          </div>
+          <div class="bag-actions">${equipButton}${sellButton}</div>
+        </div>
+      `);
+    } else {
+      slots.push('<div class="bag-slot empty">Empty slot</div>');
+    }
+  }
 
   inventoryContentEl.innerHTML = `
+    <div class="currency-row">
+      <span>Bags: ${inventory.length}/${bagCapacity}</span>
+      <span class="currency-value">${formatCurrency()}</span>
+    </div>
     <div class="card-body">Backpack slots ready for loot and spare gear. Equip pieces to move them into your worn set.</div>
     ${questLine}
-    <ul class="stack-list">${bag || '<li>Your pack is empty.</li>'}</ul>
+    <div class="bag-grid">${slots.join('')}</div>
   `;
+}
+
+function openVendor(npc) {
+  if (!npc?.vendor) return;
+  activeVendor = npc;
+  vendorOpen = true;
+  vendorPanel.classList.remove('hidden');
+  closeActionMenu();
+  renderVendorPanel();
+}
+
+function closeVendor() {
+  vendorOpen = false;
+  activeVendor = null;
+  vendorPanel.classList.add('hidden');
+  renderInventoryPanel();
+}
+
+function sellItemToVendor(item, npc) {
+  if (!npc?.vendor) return;
+  const multiplier = npc.vendor.sellMultiplier ?? 0.25;
+  const payout = Math.max(5, Math.floor((item.value || 10) * multiplier));
+  const idx = inventory.findIndex((i) => i.instanceId === item.instanceId);
+  if (idx !== -1) inventory.splice(idx, 1);
+  adjustCurrency(payout);
+  renderCurrency();
+  renderInventoryPanel();
+  renderVendorPanel();
+  showDialogue(npc.name, `Sold ${item.name} for ${formatValueCopper(payout)}.`);
+}
+
+function buyItemFromVendor(templateId) {
+  if (!activeVendor?.vendor) return;
+  const template = itemTemplates[templateId];
+  if (!template) return;
+  const cost = Math.max(5, Math.floor((template.value || 10) * (activeVendor.vendor.buyMultiplier ?? 1)));
+  if (copperTotal() < cost) {
+    showDialogue('Not enough coin', 'You need more coin to purchase that.');
+    return;
+  }
+  if (!addToInventory(template)) return;
+  adjustCurrency(-cost);
+  renderCurrency();
+  renderVendorPanel();
+  showDialogue(activeVendor.name, `You bought ${template.name} for ${formatValueCopper(cost)}.`);
+}
+
+function renderVendorPanel() {
+  if (!vendorOpen || !activeVendor) return;
+  const npc = activeVendor;
+  if (currencyDisplayEl) currencyDisplayEl.textContent = formatCurrency();
+
+  const playerSlots = inventory.map((item) => {
+    const payout = Math.max(5, Math.floor((item.value || 10) * (npc.vendor?.sellMultiplier ?? 0.25)));
+    return `
+      <div class="bag-slot">
+        <div>
+          <div class="bag-item-name">${item.name}</div>
+          <div class="bag-item-slot">${item.slot ? `Equip: ${item.slot}` : 'Carry/Use'} · ${formatValueCopper(item.value || 0)}</div>
+          <div class="subtle">${item.note || ''}</div>
+          <div class="statline">${statLine(item.stats)}</div>
+        </div>
+        <div class="bag-actions">
+          <button class="bag-btn sell" data-action="sell" data-instance="${item.instanceId}">Sell (${formatValueCopper(payout)})</button>
+          ${item.slot ? `<button class="bag-btn equip" data-action="equip" data-instance="${item.instanceId}">Equip</button>` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  const stock = (npc.vendor?.stock || []).map((id) => {
+    const template = itemTemplates[id];
+    if (!template) return '';
+    const cost = Math.max(5, Math.floor((template.value || 10) * (npc.vendor.buyMultiplier ?? 1)));
+    return `
+      <div class="bag-slot">
+        <div>
+          <div class="bag-item-name">${template.name}</div>
+          <div class="bag-item-slot">${template.slot ? `Equip: ${template.slot}` : 'Carry/Use'} · ${formatValueCopper(template.value || 0)}</div>
+          <div class="subtle">${template.note || ''}</div>
+          <div class="statline">${statLine(template.stats)}</div>
+        </div>
+        <div class="bag-actions">
+          <button class="bag-btn" data-stock="${template.id}" data-cost="${cost}">Buy (${formatValueCopper(cost)})</button>
+        </div>
+      </div>
+    `;
+  });
+
+  vendorPlayerItemsEl.innerHTML = playerSlots.join('') || '<div class="bag-slot empty">Nothing to sell.</div>';
+  vendorStockEl.innerHTML = stock.join('') || '<div class="bag-slot empty">Stock coming soon.</div>';
 }
 
 function updateHud() {
@@ -1496,7 +1801,9 @@ function handleActionSelection(actionKey) {
   if (actionKey === 'talk') {
     if (target.type === 'npc') {
       const npc = npcForActor(target);
-      if (npc) interactWithNPC(npc);
+      if (npc?.vendor) {
+        openVendor(npc);
+      } else if (npc) interactWithNPC(npc);
     } else {
       showDialogue('Action', 'You can only talk to townsfolk.');
     }
@@ -1518,6 +1825,14 @@ function handleActionSelection(actionKey) {
   }
 
   if (actionKey === 'item') {
+    if (target.type === 'npc') {
+      const npc = npcForActor(target);
+      if (npc?.vendor) {
+        openVendor(npc);
+        closeActionMenu();
+        return;
+      }
+    }
     showDialogue(target.name || 'Target', 'Using items on targets will arrive soon.');
     closeActionMenu();
     return;
@@ -1601,6 +1916,12 @@ function handleDeath(actor) {
   }
   if (actor.type === 'enemy') {
     actor.entity.enabled = false;
+    if (actor.tags?.includes('bat')) {
+      grantLoot('dock-rations', actor.name);
+    }
+    if (actor.tags?.includes('desert')) {
+      if (Math.random() > 0.5) grantLoot('desert-spices', actor.name);
+    }
     if (actor.respawn) {
       setTimeout(() => respawnActor(actor), actor.respawn.delay * 1000);
     }
@@ -1670,6 +1991,9 @@ function interactWithCrate(crate) {
   crate.entity.render.material = makeMaterial(new pc.Color(0.32, 0.24, 0.2), 0, 0.8);
   supplyQuest.progress = Math.min(supplyQuest.required, supplyQuest.progress + 1);
   showDialogue('Supply Crate', `You secure a crate. ${supplyQuest.progress}/${supplyQuest.required} gathered.`);
+  if (Math.random() > 0.45) {
+    grantLoot('dock-rations', 'Supply Crate');
+  }
   if (supplyQuest.progress >= supplyQuest.required) {
     supplyQuest.state = 'ready';
   }
@@ -1693,6 +2017,11 @@ function interactWithNPC(npc) {
   const actor = actorForEntity(npc.entity);
   if (actor) selectActor(actor);
 
+  if (npc.vendor) {
+    openVendor(npc);
+    return;
+  }
+
   if (npc.questGiver) {
     if (supplyQuest.state === 'available') {
       ensureSupplyQuestActive();
@@ -1700,6 +2029,10 @@ function interactWithNPC(npc) {
       supplyQuest.state = 'available';
       supplyQuest.progress = 0;
       resetCrateAppearance();
+      adjustCurrency(250);
+      showDialogue(npc.name, 'Well done. Here is your silver. Crates arrive often—keep them coming.');
+      updateQuestStatus();
+      return;
     }
     updateQuestStatus();
     showDialogue(npc.name, questDialogueForRyn());
